@@ -20,6 +20,7 @@ export default function LookupPage() {
   const [error, setError] = useState('');
   const [lookupResult, setLookupResult] = useState<any>(null);
   const [isTracking, setIsTracking] = useState(false);
+  const [trackingDays, setTrackingDays] = useState(30);
   const router = useRouter();
 
   const handleLookup = async (e: React.FormEvent) => {
@@ -48,8 +49,8 @@ export default function LookupPage() {
   const handleTrack = async () => {
     setIsTracking(true);
     try {
-      await api.post('/reference/track', { referenceNo, consentGiven: true });
-      toast.success("Account added to your dashboard!");
+      await api.post('/reference/track', { referenceNo, consentGiven: true, trackingDays });
+      toast.success(`Outage tracking activated for ${trackingDays} days!`);
       router.push('/dashboard');
     } catch (err: any) {
       toast.error(err.response?.data?.message || 'Failed to save account.');
@@ -115,18 +116,44 @@ export default function LookupPage() {
 
       {lookupResult && (
         <div className="space-y-12 animate-in fade-in slide-in-from-bottom-12 duration-1000">
-          <div className="flex flex-col lg:flex-row items-center justify-between gap-8 p-10 rounded-[3rem] bg-primary/10 border-2 border-primary/20 shadow-xl shadow-primary/5">
+          <div className="flex flex-col gap-6 p-10 rounded-[3rem] bg-primary/10 border-2 border-primary/20 shadow-xl shadow-primary/5">
             <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
                <div className="h-16 w-16 rounded-full bg-primary flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
                   <CheckCircle2 className="h-10 w-10 text-primary-foreground" />
                </div>
                <div className="space-y-1">
                   <h3 className="text-2xl font-black text-foreground tracking-tight uppercase">Account Found</h3>
-                  <p className="text-muted-foreground font-bold text-sm uppercase tracking-wider">Would you like to save this account for daily bill tracking?</p>
+                  <p className="text-muted-foreground font-bold text-sm uppercase tracking-wider">Enable daily outage tracking for this account?</p>
+                  <p className="text-muted-foreground/70 text-xs font-medium mt-1">
+                    <Info className="h-3 w-3 inline mr-1" />
+                    Daily tracking monitors <span className="font-bold text-foreground">power outages only</span>. Bills &amp; consumer info are fetched live when you view the dashboard.
+                  </p>
                </div>
             </div>
-            <Button onClick={handleTrack} disabled={isTracking} className="bg-primary hover:opacity-90 text-primary-foreground font-black h-16 px-12 rounded-2xl text-lg shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 border-0 w-full lg:w-auto">
-               {isTracking ? "SAVING..." : "ACTIVATE DAILY TRACKING"}
+
+            {/* Tracking Duration Selector */}
+            <div className="flex flex-col sm:flex-row items-center gap-4 p-6 bg-background/50 rounded-2xl border border-border">
+              <Label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest whitespace-nowrap">Track for:</Label>
+              <div className="flex flex-wrap gap-2">
+                {[7, 14, 30].map(days => (
+                  <Button 
+                    key={days}
+                    type="button"
+                    variant={trackingDays === days ? "default" : "outline"}
+                    onClick={() => setTrackingDays(days)}
+                    className={`h-10 px-5 rounded-xl font-black text-xs ${trackingDays === days ? 'bg-primary text-primary-foreground' : 'bg-card'}`}
+                  >
+                    {days} Days
+                  </Button>
+                ))}
+              </div>
+              <p className="text-[10px] text-muted-foreground font-medium ml-auto hidden sm:block">
+                Tracking ends automatically after {trackingDays} days
+              </p>
+            </div>
+
+            <Button onClick={handleTrack} disabled={isTracking} className="bg-primary hover:opacity-90 text-primary-foreground font-black h-16 px-12 rounded-2xl text-lg shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95 border-0 w-full">
+               {isTracking ? "SAVING..." : `ACTIVATE ${trackingDays}-DAY OUTAGE TRACKING`}
             </Button>
           </div>
 

@@ -42,8 +42,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }, [user, loading, router]);
 
   useEffect(() => {
-    if (references && references.length > 0 && !activeRefId) {
-      setActiveRefId(references[0]._id);
+    if (references && references.length > 0) {
+      // If activeRefId is stale (not in current references), reset to first valid one
+      const isValid = references.some((r: any) => r._id === activeRefId);
+      if (!activeRefId || !isValid) {
+        setActiveRefId(references[0]._id);
+      }
+    } else if (references && references.length === 0) {
+      // No references at all, clear any stale ID
+      setActiveRefId(null);
     }
   }, [references, activeRefId, setActiveRefId]);
 

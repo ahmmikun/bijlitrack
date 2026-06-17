@@ -11,6 +11,7 @@ export const protect = async (req, res, next) => {
   }
 
   if (!token) {
+    console.warn(`[Auth] Rejected - no token: ${req.method} ${req.originalUrl} (IP: ${req.ip})`);
     return res.status(401).json({ message: 'Not authorized, no token' });
   }
 
@@ -19,6 +20,7 @@ export const protect = async (req, res, next) => {
     req.user = { id: decoded.id };
     next();
   } catch (error) {
+    console.warn(`[Auth] Rejected - invalid token: ${req.method} ${req.originalUrl} (IP: ${req.ip}) - ${error.message}`);
     return res.status(401).json({ message: 'Not authorized, token failed' });
   }
 };

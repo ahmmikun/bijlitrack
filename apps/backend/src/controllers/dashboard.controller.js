@@ -20,6 +20,8 @@ const verifyOwnership = async (userId, referenceId) => {
  * Get full dashboard summary for a reference
  */
 export const getDashboardSummary = async (req, res) => {
+  console.log(`[Dashboard] Summary request for refId: ${req.params.referenceId} by userId: ${req.user.id}`);
+
   try {
     const reference = await verifyOwnership(req.user.id, req.params.referenceId);
 
@@ -35,15 +37,17 @@ export const getDashboardSummary = async (req, res) => {
 
     if (isStale) {
       try {
-        console.log(`[AutoRefresh] Refreshing stale data for ${reference.referenceNo}...`);
+        console.log(`[Dashboard] Auto-refreshing stale data for ${reference.referenceNo}...`);
         latestSnapshot = await performSync(reference, req.user.id);
+        console.log(`[Dashboard] Auto-refresh completed for ${reference.referenceNo}`);
       } catch (syncError) {
-        console.error(`[AutoRefresh] Failed: ${syncError.message}`);
+        console.error(`[Dashboard] Auto-refresh failed for ${reference.referenceNo}:`, syncError.message);
         // If sync fails, we still continue with old data if available
       }
     }
 
     if (!latestSnapshot) {
+      console.log(`[Dashboard] No data available yet for refId: ${req.params.referenceId}`);
       return res.json({ message: 'No data available yet. Tracking might be pending.' });
     }
 
@@ -56,6 +60,7 @@ export const getDashboardSummary = async (req, res) => {
       lastUpdated: latestSnapshot.scrapedAt
     });
   } catch (error) {
+    console.error(`[Dashboard] Summary error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
 };
@@ -64,6 +69,8 @@ export const getDashboardSummary = async (req, res) => {
  * Get billing details and history
  */
 export const getBillingHistory = async (req, res) => {
+  console.log(`[Dashboard] Billing history request for refId: ${req.params.referenceId}`);
+
   try {
     await verifyOwnership(req.user.id, req.params.referenceId);
 
@@ -71,8 +78,10 @@ export const getBillingHistory = async (req, res) => {
       .sort({ billMonth: -1 }) // Assuming sortable format or date
       .limit(12);
 
+    console.log(`[Dashboard] Returned ${history.length} billing records for refId: ${req.params.referenceId}`);
     res.json(history);
   } catch (error) {
+    console.error(`[Dashboard] Billing history error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
 };
@@ -81,6 +90,8 @@ export const getBillingHistory = async (req, res) => {
  * Get outage and feeder history
  */
 export const getOutageHistory = async (req, res) => {
+  console.log(`[Dashboard] Outage history request for refId: ${req.params.referenceId}`);
+
   try {
     await verifyOwnership(req.user.id, req.params.referenceId);
 
@@ -88,16 +99,20 @@ export const getOutageHistory = async (req, res) => {
       .sort({ date: -1 })
       .limit(30); // Last 30 days
 
+    console.log(`[Dashboard] Returned ${history.length} outage records for refId: ${req.params.referenceId}`);
     res.json(history);
   } catch (error) {
+    console.error(`[Dashboard] Outage history error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
-};
+};;
 
 /**
  * Get latest analysis report
  */
 export const getLatestReport = async (req, res) => {
+  console.log(`[Dashboard] Report request for refId: ${req.params.referenceId}`);
+
   try {
     await verifyOwnership(req.user.id, req.params.referenceId);
 
@@ -105,11 +120,14 @@ export const getLatestReport = async (req, res) => {
       .sort({ generatedAt: -1 });
 
     if (!report) {
+      console.log(`[Dashboard] No report available for refId: ${req.params.referenceId}`);
       return res.json({ message: 'No report generated yet.' });
     }
 
+    console.log(`[Dashboard] Report returned for refId: ${req.params.referenceId}`);
     res.json(report);
   } catch (error) {
+    console.error(`[Dashboard] Report error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
 };

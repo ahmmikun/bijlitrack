@@ -89,7 +89,7 @@ export default function ReferenceDetailsPage() {
   const consumer = details.consumerInfo || {};
   const bill = details.billingInfo?.basicInfo || {};
   const feeder = details.outageInfo || {};
-  const isOnline = feeder.current_status === 'ON';
+  const isOnline = feeder.current_status === 'ON' || feeder.currentStatus === 'ON';
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto pb-16 animate-in fade-in duration-1000 w-full overflow-x-hidden">
@@ -231,7 +231,7 @@ export default function ReferenceDetailsPage() {
               <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest mb-2 relative z-10">Grid Signal</p>
               <div className="flex items-center gap-2 relative z-10">
                 <div className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500 animate-ping'} shrink-0`}></div>
-                <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{feeder.current_status || 'OFFLINE'}</p>
+                <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{feeder.current_status || feeder.currentStatus || 'OFFLINE'}</p>
               </div>
             </div>
 
@@ -242,7 +242,7 @@ export default function ReferenceDetailsPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest mb-0.5 opacity-80">Local Feeder</p>
-                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.feederinfo?.name || 'SYNC ERROR'}</p>
+                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.feederName || feeder.feederinfo?.name || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border">
@@ -251,7 +251,7 @@ export default function ReferenceDetailsPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest mb-0.5 opacity-80">Grid Station</p>
-                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.gridstation?.name || 'SYNC ERROR'}</p>
+                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.gridStation || feeder.gridstation?.name || 'N/A'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-3">
@@ -261,7 +261,7 @@ export default function ReferenceDetailsPage() {
                 </div>
                 <div className="text-center border-l border-border">
                   <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-80 mb-0.5">P. Factor</p>
-                  <p className="text-lg font-bold font-mono text-foreground">{feeder.power_factor || '0'}<span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">%</span></p>
+                  <p className="text-lg font-bold font-mono text-foreground">{feeder.powerFactor || feeder.power_factor || '0'}<span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">%</span></p>
                 </div>
               </div>
             </div>
@@ -271,8 +271,8 @@ export default function ReferenceDetailsPage() {
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="schedule" className="w-full">
-        <div className="flex justify-start sm:justify-center mb-6 overflow-x-auto pb-2 custom-scrollbar">
-            <TabsList className="bg-muted p-1 rounded-xl w-full min-w-max flex sm:grid sm:max-w-2xl sm:grid-cols-4 h-12 shadow-sm border border-border">
+        <div className="flex justify-center mb-8">
+            <TabsList className="bg-muted/50 backdrop-blur-sm p-1.5 rounded-2xl inline-flex h-14 shadow-sm border border-border gap-1">
                 {[
                     { val: 'schedule', icon: Clock, label: 'Schedule' },
                     { val: 'billing', icon: TrendingUp, label: 'Bills' },
@@ -282,7 +282,7 @@ export default function ReferenceDetailsPage() {
                     <TabsTrigger 
                         key={t.val}
                         value={t.val} 
-                        className="rounded-lg font-bold uppercase text-[9px] sm:text-[10px] tracking-widest h-10 px-3 sm:px-4 data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm transition-all flex items-center gap-1.5 flex-1"
+                        className="rounded-xl font-bold uppercase text-[9px] sm:text-[10px] tracking-widest h-10 px-4 sm:px-6 data-[state=active]:bg-foreground data-[state=active]:text-background data-[state=active]:shadow-md transition-all flex items-center gap-2 text-muted-foreground hover:text-foreground"
                     >
                         <t.icon className="h-3.5 w-3.5 shrink-0" />
                         <span className="hidden sm:block">{t.label}</span>
@@ -293,46 +293,134 @@ export default function ReferenceDetailsPage() {
 
         {/* Schedule */}
         <TabsContent value="schedule" className="animate-in fade-in slide-in-from-top-4 duration-500 outline-none w-full">
-          <Card className="border-border shadow-sm rounded-2xl bg-card p-6 w-full">
-            <div className="flex flex-col lg:flex-row gap-6 w-full">
-               <div className="lg:w-1/3 space-y-4">
-                  <h4 className="text-xl sm:text-2xl font-bold text-foreground uppercase">Power Schedule</h4>
-                  <p className="text-xs font-medium text-muted-foreground leading-relaxed">24-hour maintenance window forecast based on current grid data.</p>
-                  <div className="pt-2 flex gap-3">
-                     <Badge variant="outline" className="px-2.5 py-1 border-green-500/20 bg-green-500/5 text-green-500 rounded-md font-bold text-[9px] uppercase tracking-widest flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div> Power On
-                     </Badge>
-                     <Badge variant="outline" className="px-2.5 py-1 border-red-500/20 bg-red-500/5 text-red-500 rounded-md font-bold text-[9px] uppercase tracking-widest flex items-center gap-1.5">
-                        <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div> Shedding
-                     </Badge>
-                  </div>
-               </div>
-               <div className="lg:w-2/3 w-full">
-                  {details.loadManagementInfo?.[0]?.maintenance_data ? (
-                    <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 w-full">
-                      {(Object.values(details.loadManagementInfo[0].maintenance_data)[0] as any[] || []).map((val: any, hour: number) => (
+          <Card className="border-border shadow-sm rounded-2xl bg-card overflow-hidden w-full">
+            <CardHeader className="p-6 border-b border-border bg-muted/20">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl font-bold text-foreground uppercase">Today&apos;s Power Schedule</CardTitle>
+                  <CardDescription className="text-xs text-muted-foreground font-medium">
+                    24-hour maintenance schedule for {feeder.feederName || feeder.feederinfo?.name || 'your feeder'}
+                  </CardDescription>
+                </div>
+                <div className="flex gap-3">
+                  <Badge variant="outline" className="px-2.5 py-1 border-green-500/20 bg-green-500/5 text-green-500 rounded-md font-bold text-[9px] uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div> ON
+                  </Badge>
+                  <Badge variant="outline" className="px-2.5 py-1 border-amber-500/20 bg-amber-500/5 text-amber-500 rounded-md font-bold text-[9px] uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-amber-500"></div> Partial
+                  </Badge>
+                  <Badge variant="outline" className="px-2.5 py-1 border-red-500/20 bg-red-500/5 text-red-500 rounded-md font-bold text-[9px] uppercase tracking-widest flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-pulse"></div> OFF
+                  </Badge>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-6">
+              {(() => {
+                // Try new format first (from parseLoadInfo)
+                const loadInfo = details.loadManagementInfo || details.outageInfo;
+                const schedule = loadInfo?.todaySchedule || [];
+                const days = loadInfo?.days || {};
+                const dayKeys = Object.keys(days).sort().reverse();
+                const latestDay = dayKeys.length > 0 ? days[dayKeys[0]] : null;
+                const hourlyMins = latestDay?.hourlyOutageMinutes || [];
+
+                // Try old format
+                const oldMaintenance = Array.isArray(details.loadManagementInfo) && details.loadManagementInfo[0]?.maintenance_data;
+                const oldScheduleValues = oldMaintenance ? (Object.values(oldMaintenance)[0] as any[] || []) : [];
+
+                if (hourlyMins.length === 24) {
+                  // New format - show hourly outage minutes
+                  const totalOff = hourlyMins.reduce((s: number, v: number) => s + v, 0);
+                  return (
+                    <div className="space-y-6">
+                      <div className="flex items-center gap-4 p-4 rounded-xl bg-muted/30 border border-border">
+                        <Zap className="h-5 w-5 text-amber-500 shrink-0" />
+                        <div>
+                          <p className="text-sm font-bold text-foreground">
+                            {totalOff === 0 ? 'No outages recorded today' : `${Math.floor(totalOff/60)}h ${totalOff%60}m total outage today`}
+                          </p>
+                          <p className="text-xs text-muted-foreground">Date: {dayKeys[0] || new Date().toISOString().split('T')[0]}</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 sm:gap-3">
+                        {hourlyMins.map((mins: number, hour: number) => {
+                          let bgClass = 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400';
+                          let label = 'ON';
+                          if (mins >= 60) {
+                            bgClass = 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400';
+                            label = '60m';
+                          } else if (mins > 0) {
+                            bgClass = 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400';
+                            label = `${mins}m`;
+                          }
+                          return (
+                            <div key={hour} className="flex flex-col items-center gap-1.5 group">
+                              <span className="text-[8px] sm:text-[9px] font-bold font-mono text-muted-foreground/60 group-hover:text-primary transition-colors">
+                                {hour.toString().padStart(2, '0')}:00
+                              </span>
+                              <div className={`w-full aspect-square rounded-xl flex items-center justify-center text-[8px] sm:text-[9px] font-bold tracking-wide transition-all border ${bgClass} hover:scale-105`}>
+                                {label}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                } else if (schedule.length === 24) {
+                  // maintenance_sch format (0 = no shedding scheduled)
+                  return (
+                    <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 sm:gap-3">
+                      {schedule.map((val: number, hour: number) => (
                         <div key={hour} className="flex flex-col items-center gap-1.5 group">
-                          <span className={`text-[9px] sm:text-[10px] font-bold font-mono group-hover:text-primary transition-colors ${val === 0 ? 'text-muted-foreground/60' : 'text-red-500/80'}`}>
+                          <span className="text-[8px] sm:text-[9px] font-bold font-mono text-muted-foreground/60 group-hover:text-primary transition-colors">
                             {hour.toString().padStart(2, '0')}:00
                           </span>
-                          <div className={`w-full aspect-square rounded-xl flex items-center justify-center text-[9px] sm:text-[10px] font-bold tracking-widest transition-all border ${
+                          <div className={`w-full aspect-square rounded-xl flex items-center justify-center text-[8px] sm:text-[9px] font-bold tracking-wide transition-all border ${
                             val === 0 
-                              ? 'bg-background text-green-600 border-border hover:border-green-500 hover:shadow-sm' 
-                              : 'bg-red-50 text-red-600 border-red-200 shadow-sm'
-                          }`}>
+                              ? 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400' 
+                              : 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+                          } hover:scale-105`}>
                             {val === 0 ? 'ON' : 'OFF'}
                           </div>
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="bg-muted/10 w-full min-h-[200px] rounded-2xl flex flex-col items-center justify-center border border-dashed border-border p-6 text-center">
-                      <Clock className="h-8 w-8 text-muted-foreground/30 mb-3" />
-                      <p className="text-muted-foreground/60 font-semibold text-xs italic">Schedule data not available</p>
+                  );
+                } else if (oldScheduleValues.length > 0) {
+                  // Old format fallback
+                  return (
+                    <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 sm:gap-3">
+                      {oldScheduleValues.map((val: any, hour: number) => (
+                        <div key={hour} className="flex flex-col items-center gap-1.5 group">
+                          <span className="text-[8px] sm:text-[9px] font-bold font-mono text-muted-foreground/60 group-hover:text-primary transition-colors">
+                            {hour.toString().padStart(2, '0')}:00
+                          </span>
+                          <div className={`w-full aspect-square rounded-xl flex items-center justify-center text-[8px] sm:text-[9px] font-bold tracking-wide transition-all border ${
+                            val === 0 
+                              ? 'bg-green-500/10 border-green-500/20 text-green-600 dark:text-green-400' 
+                              : 'bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400'
+                          } hover:scale-105`}>
+                            {val === 0 ? 'ON' : 'OFF'}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-               </div>
-            </div>
+                  );
+                } else {
+                  return (
+                    <div className="flex flex-col items-center justify-center py-16 text-center">
+                      <div className="h-16 w-16 rounded-2xl bg-muted/30 border border-border flex items-center justify-center mb-4">
+                        <Clock className="h-8 w-8 text-muted-foreground/30" />
+                      </div>
+                      <p className="text-sm font-semibold text-muted-foreground mb-1">Schedule data not available</p>
+                      <p className="text-xs text-muted-foreground/60">Click &quot;Refresh&quot; to sync the latest schedule from CCMS</p>
+                    </div>
+                  );
+                }
+              })()}
+            </CardContent>
           </Card>
         </TabsContent>
 
@@ -391,10 +479,10 @@ export default function ReferenceDetailsPage() {
         <TabsContent value="technical" className="animate-in fade-in slide-in-from-top-4 duration-500 outline-none w-full">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full">
             {[
-              { label: 'Active Power', value: feeder.active_power_kW + ' kW', icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-              { label: 'Power Factor', value: (feeder.power_factor || 0) + '%', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+              { label: 'Active Power', value: (feeder.activePower || feeder.active_power_kW || 0) + ' kW', icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+              { label: 'Power Factor', value: (feeder.powerFactor || feeder.power_factor || 0) + '%', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-500/10' },
               { label: 'Frequency', value: '50.0 Hz', icon: Clock, color: 'text-green-500', bg: 'bg-green-500/10' },
-              { label: 'Voltage', value: feeder.voltage + ' kV', icon: Info, color: 'text-purple-500', bg: 'bg-purple-500/10' }
+              { label: 'Voltage', value: (feeder.voltage || 0) + ' kV', icon: Info, color: 'text-purple-500', bg: 'bg-purple-500/10' }
             ].map((stat, i) => (
               <Card key={i} className="border-border shadow-sm rounded-2xl bg-card p-4 sm:p-6 transition-all hover:border-primary/20">
                 <CardContent className="p-0">

@@ -57,12 +57,29 @@ export default function BillingPage() {
 
   const hasHistory = Array.isArray(billingHistory) && billingHistory.length > 0;
   
+  // Parse billMonth (e.g. "SEP-25", "MAY-26") into a sortable date
+  const parseBillMonth = (monthStr: string) => {
+    if (!monthStr) return new Date(0);
+    const months: Record<string, number> = { JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5, JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11 };
+    const parts = monthStr.split('-');
+    if (parts.length !== 2) return new Date(0);
+    const mon = months[parts[0].toUpperCase()] ?? 0;
+    const year = 2000 + parseInt(parts[1] || '0');
+    return new Date(year, mon, 1);
+  };
+
+  // Sort chronologically for chart (oldest → newest, 2025 first then 2026)
   const chartData = hasHistory 
     ? [...billingHistory]
         .filter(b => b.amountDue > 0)
-        .reverse()
+        .sort((a, b) => parseBillMonth(a.billMonth).getTime() - parseBillMonth(b.billMonth).getTime())
         .map(b => ({ month: b.billMonth, amount: b.amountDue }))
     : [{ month: '---', amount: 0 }];
+
+  // Sort reverse chronologically for table (newest first, 2026 on top then 2025)
+  const sortedBillingHistory = hasHistory
+    ? [...billingHistory].sort((a, b) => parseBillMonth(b.billMonth).getTime() - parseBillMonth(a.billMonth).getTime())
+    : [];
 
   return (
     <div className="space-y-8 sm:space-y-12 animate-in fade-in duration-1000 pb-20">
@@ -95,48 +112,51 @@ export default function BillingPage() {
               <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorAmt" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.5} />
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--color-muted-foreground)" opacity={0.2} />
                 <XAxis 
                   dataKey="month" 
                   tickLine={false} 
                   axisLine={false} 
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 900 }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10, fontWeight: 900 }}
                   dy={15}
                 />
                 <YAxis 
                   tickLine={false} 
                   axisLine={false} 
-                  tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10, fontWeight: 900 }}
+                  tick={{ fill: 'var(--color-muted-foreground)', fontSize: 10, fontWeight: 900 }}
                   tickFormatter={(value) => `Rs ${value.toLocaleString()}`}
-                  width={60}
+                  width={70}
                 />
                 <Tooltip 
-                  cursor={{ stroke: 'hsl(var(--primary))', strokeWidth: 1 }}
+                  cursor={{ stroke: 'var(--color-primary)', strokeWidth: 1 }}
                   formatter={(value: any) => [`Rs ${(value || 0).toLocaleString()}`, 'BILL_AMOUNT']}
                   contentStyle={{ 
-                    backgroundColor: 'hsl(var(--card))',
+                    backgroundColor: 'var(--color-card)',
+                    color: 'var(--color-card-foreground)',
                     borderRadius: '20px', 
-                    border: '1px solid hsl(var(--border))', 
-                    boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)',
+                    border: '1px solid var(--color-muted-foreground)', 
+                    boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.25)',
                     padding: '12px',
                     fontWeight: '900',
                     textTransform: 'uppercase',
                     fontSize: '9px'
                   }}
+                  labelStyle={{ color: 'var(--color-muted-foreground)', fontWeight: '700' }}
+                  itemStyle={{ color: 'var(--color-foreground)' }}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="amount" 
-                  stroke="hsl(var(--primary))" 
+                  stroke="var(--color-primary)" 
                   strokeWidth={4}
                   fillOpacity={1}
                   fill="url(#colorAmt)"
-                  dot={{ r: 4, fill: 'hsl(var(--primary))', strokeWidth: 2, stroke: 'hsl(var(--background))' }}
-                  activeDot={{ r: 8, strokeWidth: 0 }} 
+                  dot={{ r: 5, fill: 'var(--color-primary)', strokeWidth: 3, stroke: 'var(--color-card)' }}
+                  activeDot={{ r: 8, fill: 'var(--color-primary)', strokeWidth: 3, stroke: 'var(--color-card)' }} 
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -167,7 +187,7 @@ export default function BillingPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {billingHistory.map((bill: any) => (
+                    {sortedBillingHistory.map((bill: any) => (
                       <TableRow key={bill._id} className="h-20 sm:h-24 border-b border-border/50 hover:bg-primary/5 transition-all group">
                         <TableCell className="font-black text-foreground pl-6 sm:pl-12 text-base sm:text-lg tracking-tighter uppercase whitespace-nowrap">{bill.billMonth}</TableCell>
                         <TableCell className="font-black text-primary text-right text-lg sm:text-xl tracking-tighter group-hover:scale-105 transition-transform whitespace-nowrap">

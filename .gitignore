@@ -4,3 +4,5 @@ src/data/*.png
 .env
 .gemini
 /prompts
+logs/
+.vscode/

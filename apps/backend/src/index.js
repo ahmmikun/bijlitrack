@@ -22,17 +22,27 @@ dns.setDefaultResultOrder("ipv4first");
 app.use(cors());
 app.use(express.json());
 
+// Request logging middleware
+app.use((req, res, next) => {
+  const start = Date.now();
+  res.on('finish', () => {
+    const duration = Date.now() - start;
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} ${res.statusCode} ${duration}ms`);
+  });
+  next();
+});
+
 // Database Connection
 if (process.env.NODE_ENV !== 'test') {
   mongoose.connect(process.env.MONGODB_URI)
     .then(() => {
-      console.log('Connected to MongoDB');
+      console.log('[DB] Connected to MongoDB successfully');
       // Initialize Cron Jobs only after successful DB connection
       initDailyTracker();
     })
     .catch(err => {
-      console.error('MongoDB connection error:', err);
-      console.log('Please ensure your IP is whitelisted in MongoDB Atlas.');
+      console.error('[DB] MongoDB connection error:', err.message);
+      console.warn('[DB] Please ensure your IP is whitelisted in MongoDB Atlas');
     });
 }
 
@@ -45,15 +55,16 @@ app.use('/api/auth', authRoutes);
 app.use('/api/reference', referenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 
-// Error Handling Middleware
+// Global Error Handling Middleware
 app.use((err, req, res, next) => {
+  console.error(`[ERROR] ${req.method} ${req.originalUrl} - ${err.message}`);
   console.error(err.stack);
   res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
 if (process.env.NODE_ENV !== 'test') {
   app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
+    console.log(`[Server] BijliTrack API running on port ${PORT}`);
   });
 }
 
