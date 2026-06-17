@@ -1,2 +1,2 @@
-# Lesco-Electricity-Moniter
+# electricity-moniter-app
 

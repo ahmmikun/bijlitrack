@@ -1,0 +1,20 @@
+{
+  "name": "bijlitrack-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BijliTrack - Smart Electricity Bill & Outage Intelligence Dashboard",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "backend": "npm run dev -w apps/backend",
+    "frontend": "npm run dev -w apps/frontend",
+    "dev": "npm run dev --workspaces --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "mongodb": "^7.3.0"
+  }
+}
