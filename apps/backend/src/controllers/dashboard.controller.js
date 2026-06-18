@@ -31,9 +31,9 @@ export const getDashboardSummary = async (req, res) => {
       .lean();
 
     // AUTO-REFRESH LOGIC:
-    // If no snapshot exists, or if it's older than 6 hours, try to refresh it in real-time
-    const SIX_HOURS = 6 * 60 * 60 * 1000;
-    const isStale = !latestSnapshot || (new Date() - new Date(latestSnapshot.scrapedAt) > SIX_HOURS);
+    // If no snapshot exists, or if it's older than 1 hour, try to refresh it in real-time
+    const ONE_HOUR = 60 * 60 * 1000;
+    const isStale = !latestSnapshot || (new Date() - new Date(latestSnapshot.scrapedAt) > ONE_HOUR);
 
     if (isStale) {
       try {

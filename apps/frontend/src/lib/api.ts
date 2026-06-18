@@ -14,6 +14,7 @@ const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
+  timeout: 30000, // 30s timeout - syncs can take time due to CCMS API calls
 });
 
 // Add a request interceptor to include the JWT token

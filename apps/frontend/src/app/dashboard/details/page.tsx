@@ -161,6 +161,16 @@ export default function ReferenceDetailsPage() {
             </div>
             <div className="grid grid-cols-1 xs:grid-cols-2 gap-4">
               <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">Reference No</p>
+                <p className="text-sm font-bold text-foreground font-mono truncate">{consumer.REFNO || bill.refNo || 'N/A'}</p>
+              </div>
+              <div className="space-y-1 xs:text-right">
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">Connection Type</p>
+                <p className="text-sm font-bold text-foreground truncate">{bill.cons_type || bill.cons_cat || bill.tariffDescription || 'N/A'}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 xs:grid-cols-2 gap-4">
+              <div className="space-y-1">
                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">CNIC</p>
                 <p className="text-sm font-bold text-foreground font-mono truncate">{consumer.NICNO || 'N/A'}</p>
               </div>
@@ -268,6 +278,108 @@ export default function ReferenceDetailsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Meter Status Section */}
+      {(() => {
+        const meterInfo = details.billingInfo?.metersInfo?.[0];
+        const meterStatus = details.billingInfo?.basicInfo?.meter1Status;
+        const meterReadDate = details.billingInfo?.basicInfo?.meterReadDate;
+        if (!meterInfo && !meterStatus) return null;
+
+        return (
+          <Card className="border-border shadow-sm bg-card rounded-2xl overflow-hidden">
+            <CardHeader className="p-4 sm:p-6 bg-muted/20 border-b border-border">
+              <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                <Cpu className="h-4 w-4 text-emerald-500" /> Meter Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6">
+                <div className="space-y-1.5 text-center p-4 bg-muted/30 rounded-xl border border-border">
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">Meter No</p>
+                  <p className="text-sm font-bold text-foreground font-mono truncate">{meterInfo?.mtrNo || 'N/A'}</p>
+                </div>
+                <div className="space-y-1.5 text-center p-4 bg-muted/30 rounded-xl border border-border">
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">Consumption</p>
+                  <p className="text-sm font-bold text-foreground font-mono">{meterInfo?.mtrKwhConsump || '0'} <span className="text-[9px] text-muted-foreground font-sans">kWh</span></p>
+                </div>
+                <div className="space-y-1.5 text-center p-4 bg-muted/30 rounded-xl border border-border">
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">Meter Status</p>
+                  <Badge className={`font-bold text-[10px] px-3 py-1 rounded-lg ${
+                    (meterInfo?.mtrStatus || meterStatus) === 'OK' || (meterInfo?.mtrStatus || meterStatus) === 'Normal'
+                      ? 'bg-green-500/10 text-green-500 border-green-500/20'
+                      : 'bg-amber-500/10 text-amber-500 border-amber-500/20'
+                  } border`}>
+                    {meterInfo?.mtrStatus || meterStatus || 'N/A'}
+                  </Badge>
+                </div>
+                <div className="space-y-1.5 text-center p-4 bg-muted/30 rounded-xl border border-border">
+                  <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-70">Last Reading</p>
+                  <p className="text-sm font-bold text-foreground">
+                    {meterReadDate ? new Date(meterReadDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : 'N/A'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
+      {/* Bill Breakdown Section */}
+      {(() => {
+        const company = details.billingInfo?.basicInfo?.companyCharges;
+        const govt = details.billingInfo?.basicInfo?.govtCharges;
+        if (!company && !govt) return null;
+
+        return (
+          <Card className="border-border shadow-sm bg-card rounded-2xl overflow-hidden">
+            <CardHeader className="p-4 sm:p-6 bg-muted/20 border-b border-border">
+              <CardTitle className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-2">
+                <Receipt className="h-4 w-4 text-indigo-500" /> Current Bill Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 sm:p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Company Charges */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border pb-2">Company Charges</p>
+                  <div className="space-y-2.5">
+                    {[
+                      { label: 'Energy Charges', value: company?.energyCharges },
+                      { label: 'Fixed Charges', value: company?.fixedCharges },
+                      { label: 'Variable FPA', value: company?.varFPA },
+                      { label: 'Qtr Tariff Adjustments', value: company?.qtrTariffAdjustments },
+                    ].map((item, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+                        <span className="text-sm font-bold text-foreground font-mono">Rs. {item.value || '0'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Government Charges */}
+                <div className="space-y-3">
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest border-b border-border pb-2">Govt Charges & Taxes</p>
+                  <div className="space-y-2.5">
+                    {[
+                      { label: 'Electricity Duty', value: govt?.electricityDuty },
+                      { label: 'GST', value: govt?.gst },
+                      { label: 'FC Surcharge', value: govt?.fcSurcharge },
+                      { label: 'Taxes on FPA', value: govt?.taxesOnFPA },
+                    ].map((item, i) => (
+                      <div key={i} className="flex justify-between items-center">
+                        <span className="text-xs font-medium text-muted-foreground">{item.label}</span>
+                        <span className="text-sm font-bold text-foreground font-mono">Rs. {item.value || '0'}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Analytics Tabs */}
       <Tabs defaultValue="schedule" className="w-full">

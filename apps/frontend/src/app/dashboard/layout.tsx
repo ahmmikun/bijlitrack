@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Receipt, Zap, FileText, Settings, LogOut, Menu, ChevronDown, Check, Bell, Search } from 'lucide-react';
+import { LayoutDashboard, Receipt, Zap, FileText, Settings, LogOut, Menu, ChevronDown, Check, Bell, Search, MessageSquareWarning, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -16,7 +16,9 @@ const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Bill History', href: '/dashboard/billing', icon: Receipt },
   { name: 'Outages & Load', href: '/dashboard/outages', icon: Zap },
+  { name: 'Complaints', href: '/dashboard/complaints', icon: MessageSquareWarning },
   { name: 'Reports', href: '/dashboard/reports', icon: FileText },
+  { name: 'About', href: '/dashboard/about', icon: Info },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
@@ -121,7 +123,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   const NavLinks = () => (
-    <nav className="flex-1 space-y-1.5 px-4">
+    <nav className="flex-1 overflow-y-auto space-y-1.5 px-4 py-2">
       {navigation.map((item) => {
         const isActive = pathname === item.href || (pathname.startsWith(item.href) && item.href !== '/dashboard');
         const isExactDashboard = item.href === '/dashboard' && pathname === '/dashboard';
@@ -167,8 +169,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <ReferenceSelector />
         <NavLinks />
 
-        <div className="p-6 mt-auto">
-          <div className="bg-card border border-border rounded-2xl p-5 shadow-xl relative overflow-hidden group">
+        <div className="p-4 mt-auto shrink-0">
+          <div className="bg-card border border-border rounded-2xl p-4 shadow-xl relative overflow-hidden group">
             <div className="absolute -top-10 -right-10 w-24 h-24 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
             <div className="flex items-center gap-4 relative z-10">
               <div className="h-10 w-10 rounded-xl bg-primary flex items-center justify-center text-primary-foreground font-black text-lg border-2 border-background/20">
@@ -224,11 +226,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <main className="flex-1 py-10 px-4 sm:px-10 lg:px-12 max-w-[1600px] w-full mx-auto transition-all duration-300">
           {children}
         </main>
+
+        <footer className="border-t border-border px-6 sm:px-10 py-5 text-center bg-amber-500/5">
+          <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-widest">
+            ⚡ Coverage: PITC/CCMS supported public-sector DISCOs only. <span className="text-red-500">K-Electric may not be supported.</span>
+          </p>
+        </footer>
       </div>
 
       {/* Mobile Drawer */}
       <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
-        <SheetContent side="left" className="w-[300px] p-0 border-r-0 rounded-r-3xl bg-card">
+        <SheetContent side="left" className="w-[300px] p-0 border-r-0 rounded-r-3xl bg-card flex flex-col">
           <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           <div className="flex h-24 shrink-0 items-center px-8 border-b border-border">
             <div className="flex items-center gap-3">
@@ -238,11 +246,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-2xl font-black text-foreground tracking-tighter uppercase">BijliTrack</span>
             </div>
           </div>
-          <div className="py-8 overflow-y-auto max-h-[calc(100vh-160px)]">
+          <div className="flex-1 py-6 overflow-y-auto">
             <ReferenceSelector />
             <NavLinks />
           </div>
-          <div className="absolute bottom-8 left-0 right-0 px-8">
+          <div className="p-6 border-t border-border shrink-0">
              <Button 
               onClick={logout}
               variant="destructive"

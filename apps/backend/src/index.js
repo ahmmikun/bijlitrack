@@ -9,6 +9,7 @@ import { initDailyTracker } from './jobs/dailyTracker.js';
 import authRoutes from './routes/auth.routes.js';
 import referenceRoutes from './routes/reference.routes.js';
 import dashboardRoutes from './routes/dashboard.routes.js';
+import complaintRoutes from './routes/complaint.routes.js';
 
 dotenv.config();
 
@@ -54,6 +55,7 @@ app.get('/', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/reference', referenceRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/complaints', complaintRoutes);
 
 // Global Error Handling Middleware
 app.use((err, req, res, next) => {
