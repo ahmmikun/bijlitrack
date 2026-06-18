@@ -89,7 +89,7 @@ export default function ReferenceDetailsPage() {
   const consumer = details.consumerInfo || {};
   const bill = details.billingInfo?.basicInfo || {};
   const feeder = details.outageInfo || {};
-  const isOnline = feeder.current_status === 'ON' || feeder.currentStatus === 'ON';
+  const isOnline = feeder.currentStatus === 'ON';
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto pb-16 animate-in fade-in duration-1000 w-full overflow-x-hidden">
@@ -231,7 +231,7 @@ export default function ReferenceDetailsPage() {
               <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest mb-2 relative z-10">Grid Signal</p>
               <div className="flex items-center gap-2 relative z-10">
                 <div className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500 animate-ping'} shrink-0`}></div>
-                <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{feeder.current_status || feeder.currentStatus || 'OFFLINE'}</p>
+                <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{feeder.currentStatus || 'OFFLINE'}</p>
               </div>
             </div>
 
@@ -242,7 +242,7 @@ export default function ReferenceDetailsPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest mb-0.5 opacity-80">Local Feeder</p>
-                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.feederName || feeder.feederinfo?.name || 'N/A'}</p>
+                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.feederName || 'N/A'}</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border">
@@ -251,7 +251,7 @@ export default function ReferenceDetailsPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-[8px] text-muted-foreground uppercase font-bold tracking-widest mb-0.5 opacity-80">Grid Station</p>
-                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.gridStation || feeder.gridstation?.name || 'N/A'}</p>
+                  <p className="text-xs font-semibold text-foreground truncate uppercase">{feeder.gridStation || 'N/A'}</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4 pt-3">
@@ -261,7 +261,7 @@ export default function ReferenceDetailsPage() {
                 </div>
                 <div className="text-center border-l border-border">
                   <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-80 mb-0.5">P. Factor</p>
-                  <p className="text-lg font-bold font-mono text-foreground">{feeder.powerFactor || feeder.power_factor || '0'}<span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">%</span></p>
+                  <p className="text-lg font-bold font-mono text-foreground">{feeder.powerFactor || '0'}<span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">%</span></p>
                 </div>
               </div>
             </div>
@@ -299,7 +299,7 @@ export default function ReferenceDetailsPage() {
                 <div className="space-y-1">
                   <CardTitle className="text-xl font-bold text-foreground uppercase">Today&apos;s Power Schedule</CardTitle>
                   <CardDescription className="text-xs text-muted-foreground font-medium">
-                    24-hour maintenance schedule for {feeder.feederName || feeder.feederinfo?.name || 'your feeder'}
+                    24-hour maintenance schedule for {feeder.feederName || 'your feeder'}
                   </CardDescription>
                 </div>
                 <div className="flex gap-3">
@@ -479,8 +479,8 @@ export default function ReferenceDetailsPage() {
         <TabsContent value="technical" className="animate-in fade-in slide-in-from-top-4 duration-500 outline-none w-full">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 w-full">
             {[
-              { label: 'Active Power', value: (feeder.activePower || feeder.active_power_kW || 0) + ' kW', icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-              { label: 'Power Factor', value: (feeder.powerFactor || feeder.power_factor || 0) + '%', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+              { label: 'Active Power', value: (feeder.activePower || 0) + ' kW', icon: Zap, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+              { label: 'Power Factor', value: (feeder.powerFactor || 0) + '%', icon: Activity, color: 'text-blue-500', bg: 'bg-blue-500/10' },
               { label: 'Frequency', value: '50.0 Hz', icon: Clock, color: 'text-green-500', bg: 'bg-green-500/10' },
               { label: 'Voltage', value: (feeder.voltage || 0) + ' kV', icon: Info, color: 'text-purple-500', bg: 'bg-purple-500/10' }
             ].map((stat, i) => (

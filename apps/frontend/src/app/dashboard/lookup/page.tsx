@@ -254,12 +254,12 @@ export default function LookupPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="p-8 space-y-10">
-                <div className={`p-8 rounded-[2.5rem] border-2 flex flex-col items-center justify-center transition-all shadow-inner ${lookupResult.schedule?.current_status === 'ON' ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
+                <div className={`p-8 rounded-[2.5rem] border-2 flex flex-col items-center justify-center transition-all shadow-inner ${lookupResult.schedule?.currentStatus === 'ON' ? 'bg-green-500/5 border-green-500/10' : 'bg-red-500/5 border-red-500/10'}`}>
                   <p className="text-[10px] text-muted-foreground uppercase font-black tracking-[0.3em] mb-4">Grid Signal</p>
                   <div className="flex items-center gap-4">
-                    <div className={`h-4 w-4 rounded-full ${lookupResult.schedule?.current_status === 'ON' ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,1)] animate-pulse' : 'bg-red-500 animate-ping'}`}></div>
-                    <p className={`text-4xl font-black tracking-tighter uppercase ${lookupResult.schedule?.current_status === 'ON' ? 'text-green-500' : 'text-red-500'}`}>
-                      {lookupResult.schedule?.current_status || 'OFFLINE'}
+                    <div className={`h-4 w-4 rounded-full ${lookupResult.schedule?.currentStatus === 'ON' ? 'bg-green-500 shadow-[0_0_15px_rgba(34,197,94,1)] animate-pulse' : 'bg-red-500 animate-ping'}`}></div>
+                    <p className={`text-4xl font-black tracking-tighter uppercase ${lookupResult.schedule?.currentStatus === 'ON' ? 'text-green-500' : 'text-red-500'}`}>
+                      {lookupResult.schedule?.currentStatus || 'OFFLINE'}
                     </p>
                   </div>
                 </div>
@@ -271,7 +271,7 @@ export default function LookupPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1 opacity-70">Local Feeder</p>
-                      <p className="text-sm font-black text-foreground truncate uppercase tracking-tighter">{lookupResult.schedule?.feederinfo?.name || 'SYNC ERROR'}</p>
+                      <p className="text-sm font-black text-foreground truncate uppercase tracking-tighter">{lookupResult.schedule?.feederName || 'N/A'}</p>
                     </div>
                   </div>
                   <div className="flex items-start gap-5">
@@ -280,7 +280,7 @@ export default function LookupPage() {
                     </div>
                     <div className="min-w-0">
                       <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1 opacity-70">Grid Station</p>
-                      <p className="text-sm font-black text-foreground truncate uppercase tracking-tighter">{lookupResult.schedule?.gridstation?.name || 'SYNC ERROR'}</p>
+                      <p className="text-sm font-black text-foreground truncate uppercase tracking-tighter">{lookupResult.schedule?.gridStation || 'N/A'}</p>
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-8 pt-6 border-t border-border">
@@ -290,7 +290,7 @@ export default function LookupPage() {
                     </div>
                     <div className="text-right">
                       <p className="text-[9px] text-muted-foreground uppercase font-black tracking-widest opacity-60 mb-1">Power Factor</p>
-                      <p className="text-xl font-black text-foreground tracking-tighter">{lookupResult.schedule?.power_factor || '0'}%</p>
+                      <p className="text-xl font-black text-foreground tracking-tighter">{lookupResult.schedule?.powerFactor || '0'}%</p>
                     </div>
                   </div>
                 </div>
@@ -330,9 +330,9 @@ export default function LookupPage() {
                       </div>
                    </div>
                    <div className="lg:w-2/3 w-full">
-                      {lookupResult.schedule?.loaddata?.[0]?.maintenance_data ? (
+                      {lookupResult.schedule?.todaySchedule?.length > 0 ? (
                         <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 sm:gap-4 w-full">
-                          {(Object.values(lookupResult.schedule.loaddata[0].maintenance_data)[0] as any[] || []).map((val: any, hour: number) => (
+                          {lookupResult.schedule.todaySchedule.map((val: any, hour: number) => (
                             <div key={hour} className="flex flex-col items-center gap-1.5 sm:gap-2 group">
                               <span className="text-[9px] sm:text-[10px] font-black text-muted-foreground/40 uppercase tracking-tighter group-hover:text-primary transition-colors">{hour}:00</span>
                               <div className={`w-full aspect-square rounded-[1rem] sm:rounded-2xl flex items-center justify-center text-[9px] sm:text-[10px] font-black tracking-widest transition-all border-2 ${

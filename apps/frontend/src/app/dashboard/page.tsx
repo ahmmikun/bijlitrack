@@ -131,7 +131,7 @@ export default function DashboardOverview() {
             const bill = details.billingInfo?.basicInfo;
             const feeder = details.outageInfo;
             const consumer = details.consumerInfo;
-            const isOnline = feeder?.current_status === 'ON' || feeder?.currentStatus === 'ON';
+            const isOnline = feeder?.currentStatus === 'ON';
             const isActive = activeRefId === ref._id;
 
             return (
@@ -173,7 +173,7 @@ export default function DashboardOverview() {
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0 ml-4">
                       <Badge variant={isOnline ? "default" : "destructive"} className={`${isOnline ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20" : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 hover:bg-red-500/20"} font-semibold text-xs px-3 py-1 rounded-full border`}>
-                        {feeder?.current_status || feeder?.currentStatus || 'OFF'}
+                        {feeder?.currentStatus || 'OFF'}
                       </Badge>
                       <span className="text-xs text-muted-foreground/60">Power Status</span>
                     </div>
@@ -208,7 +208,7 @@ export default function DashboardOverview() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-xs text-muted-foreground font-medium mb-0.5">Feeder Name</p>
-                        <p className="truncate text-sm font-semibold text-foreground">{feeder?.feederName || feeder?.feederinfo?.name || 'Syncing...'}</p>
+                        <p className="truncate text-sm font-semibold text-foreground">{feeder?.feederName || 'Syncing...'}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -220,7 +220,7 @@ export default function DashboardOverview() {
                         <p className="text-sm font-mono font-medium text-foreground">
                           {feeder?.voltage || 0} <span className="text-xs font-sans text-muted-foreground">kV</span> 
                           <span className="mx-2 text-muted-foreground/30">|</span> 
-                          {feeder?.powerFactor || feeder?.power_factor || 0}<span className="text-xs font-sans text-muted-foreground">%</span>
+                          {feeder?.powerFactor || 0}<span className="text-xs font-sans text-muted-foreground">%</span>
                         </p>
                       </div>
                     </div>
