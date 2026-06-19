@@ -6,8 +6,30 @@
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'application/json, text/plain, */*',
+  'Accept-Language': 'en-US,en;q=0.9',
   'Origin': 'https://ccms.pitc.com.pk',
-  'Referer': 'https://ccms.pitc.com.pk/'
+  'Referer': 'https://ccms.pitc.com.pk/',
+  'X-Requested-With': 'XMLHttpRequest'
+};
+
+/**
+ * Safely fetch JSON from CCMS - handles cases where HTML is returned instead of JSON
+ * (e.g. when CCMS blocks requests from non-Pakistani IPs)
+ */
+const safeFetchJson = async (url) => {
+  const res = await fetch(url, { headers: HEADERS });
+  const text = await res.text();
+  
+  // Check if response is HTML instead of JSON
+  if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+    throw new Error(`CCMS returned HTML instead of JSON (status: ${res.status}). The server may be blocking requests from this IP/region.`);
+  }
+  
+  try {
+    return { data: JSON.parse(text), status: res.status };
+  } catch (e) {
+    throw new Error(`Invalid JSON response from CCMS (status: ${res.status}): ${text.substring(0, 100)}`);
+  }
 };
 
 /**
@@ -124,9 +146,8 @@ export const fetchLoadInfo = async (referenceNo) => {
 
   try {
     console.log(`[CCMS] Fetching load info for ${referenceNo}...`);
-    const res = await fetch(`https://ccms.pitc.com.pk/get-loadinfo/${referenceNo}`, { headers: HEADERS });
-    const json = await res.json();
-    console.log(`[CCMS] Load info fetched (${Date.now() - start}ms) - Status: ${res.status}`);
+    const { data: json, status } = await safeFetchJson(`https://ccms.pitc.com.pk/get-loadinfo/${referenceNo}`);
+    console.log(`[CCMS] Load info fetched (${Date.now() - start}ms) - Status: ${status}`);
 
     if (json.message !== 'Success' || !json.load?.[0]?.response?.data?.[0]) {
       throw new Error(json.message || 'Load info not found');
@@ -167,9 +188,8 @@ export const fetchAllDetails = async (referenceNo) => {
     // 1. Fetch User Details (Name, CNIC, Address, Feeder Code)
     console.log(`[CCMS] Fetching user details for ${referenceNo}...`);
     let start = Date.now();
-    const userRes = await fetch(`https://ccms.pitc.com.pk/api/details/user?reference=${referenceNo}`, { headers: HEADERS });
-    const userData = await userRes.json();
-    console.log(`[CCMS] User details fetched (${Date.now() - start}ms) - Status: ${userRes.status}`);
+    const { data: userData, status: userStatus } = await safeFetchJson(`https://ccms.pitc.com.pk/api/details/user?reference=${referenceNo}`);
+    console.log(`[CCMS] User details fetched (${Date.now() - start}ms) - Status: ${userStatus}`);
 
     if (userData.message === 'Success') {
       result.user = userData.user;
@@ -180,9 +200,8 @@ export const fetchAllDetails = async (referenceNo) => {
     // 2. Fetch Bill Details (Current bill, 12-month history)
     console.log(`[CCMS] Fetching bill details for ${referenceNo}...`);
     start = Date.now();
-    const billRes = await fetch(`https://ccms.pitc.com.pk/api/details/bill?reference=${referenceNo}`, { headers: HEADERS });
-    const billData = await billRes.json();
-    console.log(`[CCMS] Bill details fetched (${Date.now() - start}ms) - Status: ${billRes.status}`);
+    const { data: billData, status: billStatus } = await safeFetchJson(`https://ccms.pitc.com.pk/api/details/bill?reference=${referenceNo}`);
+    console.log(`[CCMS] Bill details fetched (${Date.now() - start}ms) - Status: ${billStatus}`);
 
     if (billData.bill) {
       result.bill = billData.bill;
@@ -191,9 +210,8 @@ export const fetchAllDetails = async (referenceNo) => {
     // 3. Fetch Load Info (outages, events, real-time status)
     console.log(`[CCMS] Fetching load info for ${referenceNo}...`);
     start = Date.now();
-    const loadRes = await fetch(`https://ccms.pitc.com.pk/get-loadinfo/${referenceNo}`, { headers: HEADERS });
-    const loadJson = await loadRes.json();
-    console.log(`[CCMS] Load info fetched (${Date.now() - start}ms) - Status: ${loadRes.status}`);
+    const { data: loadJson, status: loadStatus } = await safeFetchJson(`https://ccms.pitc.com.pk/get-loadinfo/${referenceNo}`);
+    console.log(`[CCMS] Load info fetched (${Date.now() - start}ms) - Status: ${loadStatus}`);
 
     if (loadJson.message === 'Success' && loadJson.load?.[0]?.response?.data?.[0]) {
       const feederData = loadJson.load[0].response.data[0];
