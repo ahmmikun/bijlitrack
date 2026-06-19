@@ -27,7 +27,31 @@ export default function DashboardOverview() {
       const detailedRefs = await Promise.all(res.data.map(async (ref: any) => {
         try {
           const summaryRes = await api.get(`/dashboard/${ref._id}`);
-          return { ...ref, details: summaryRes.data };
+          const details = summaryRes.data;
+
+          // If no data stored yet, fetch from CCMS directly and save
+          if (!details.consumerInfo && !details.billingInfo) {
+            try {
+              const ccmsData = await fetchAllCCMSData(ref.referenceNo);
+              if (ccmsData.user || ccmsData.bill) {
+                await api.post(`/dashboard/${ref._id}/save`, {
+                  consumerInfo: ccmsData.user,
+                  billingInfo: ccmsData.bill,
+                  outageInfo: ccmsData.loadInfo
+                });
+                return { ...ref, details: { 
+                  consumerInfo: ccmsData.user, 
+                  billingInfo: ccmsData.bill, 
+                  outageInfo: ccmsData.loadInfo,
+                  lastUpdated: new Date().toISOString()
+                }};
+              }
+            } catch (ccmsErr) {
+              console.error('CCMS auto-fetch failed:', ccmsErr);
+            }
+          }
+
+          return { ...ref, details };
         } catch (e) {
           return ref;
         }
