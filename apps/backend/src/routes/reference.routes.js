@@ -1,17 +1,13 @@
 import express from 'express';
-import { lookupReference, trackReference, getMyReferences, deleteReference, syncReference } from '../controllers/reference.controller.js';
+import { trackReference, getMyReferences, deleteReference } from '../controllers/reference.controller.js';
 import { protect } from '../middlewares/auth.middleware.js';
 
 const router = express.Router();
 
-// One-time lookup doesn't technically require login, 
-// but requirements say "Only logged-in users can track".
-// Let's keep lookup public but tracking protected.
-router.post('/lookup', lookupReference);
+router.use(protect); // All reference routes require auth
 
-router.post('/track', protect, trackReference);
-router.get('/my', protect, getMyReferences);
-router.post('/:id/sync', protect, syncReference);
-router.delete('/:id', protect, deleteReference);
+router.post('/track', trackReference);
+router.get('/my', getMyReferences);
+router.delete('/:id', deleteReference);
 
 export default router;

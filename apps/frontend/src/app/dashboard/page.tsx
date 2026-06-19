@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { fetchAllCCMSData } from '@/lib/ccms';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,14 +36,23 @@ export default function DashboardOverview() {
     }
   });
 
-  const handleSync = async (id: string) => {
-    const toastId = toast.loading("Fetching latest updates...");
+  const handleSync = async (id: string, referenceNo: string) => {
+    const toastId = toast.loading("Fetching latest data from CCMS...");
     try {
-      await api.post(`/reference/${id}/sync`);
+      // Fetch directly from CCMS (client-side, no geo-block)
+      const ccmsData = await fetchAllCCMSData(referenceNo);
+      
+      // Send to backend to save
+      await api.post(`/dashboard/${id}/save`, {
+        consumerInfo: ccmsData.user,
+        billingInfo: ccmsData.bill,
+        outageInfo: ccmsData.loadInfo
+      });
+
       toast.success("Account data updated", { id: toastId });
       queryClient.invalidateQueries({ queryKey: ['my-references'] });
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Update failed", { id: toastId });
+      toast.error(err.message || "Update failed", { id: toastId });
     }
   };
 
@@ -239,7 +249,7 @@ export default function DashboardOverview() {
                     {isActive ? 'Selected' : 'Select'}
                   </Button>
                   <Button
-                    onClick={() => handleSync(ref._id)}
+                    onClick={() => handleSync(ref._id, ref.referenceNo)}
                     variant="outline"
                     className="h-12 font-semibold rounded-xl text-xs bg-card text-foreground border-border hover:bg-accent hover:text-foreground transition-all active:scale-95 group/sync"
                   >

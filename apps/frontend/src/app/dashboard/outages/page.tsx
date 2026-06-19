@@ -2,6 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { fetchLoadInfo } from '@/lib/ccms';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,6 +22,15 @@ export default function OutagesPage() {
   const activeRef = refId || activeRefId;
   const queryClient = useQueryClient();
 
+  // Get reference details to know the referenceNo
+  const { data: references } = useQuery({
+    queryKey: ['my-references-list'],
+    queryFn: async () => {
+      const res = await api.get('/reference/my');
+      return Array.isArray(res.data) ? res.data : [];
+    }
+  });
+
   const { data: outageHistory, isLoading } = useQuery({
     queryKey: ['outage-history', activeRef],
     queryFn: async () => {
@@ -33,13 +43,21 @@ export default function OutagesPage() {
 
   const handleSync = async () => {
     if (!activeRef) return;
+    const ref = references?.find((r: any) => r._id === activeRef);
+    if (!ref) return;
+
     const toastId = toast.loading("Fetching latest outage data from CCMS...");
     try {
-      await api.post(`/reference/${activeRef}/sync`);
+      // Fetch directly from CCMS (client-side)
+      const loadInfo = await fetchLoadInfo(ref.referenceNo);
+      
+      // Save to backend
+      await api.post(`/dashboard/${activeRef}/save`, { outageInfo: loadInfo });
+
       toast.success("Outage data synced!", { id: toastId });
       queryClient.invalidateQueries({ queryKey: ['outage-history', activeRef] });
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Sync failed", { id: toastId });
+      toast.error(err.message || "Sync failed", { id: toastId });
     }
   };
 

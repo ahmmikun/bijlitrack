@@ -3,7 +3,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import dns from "node:dns";
-import { initDailyTracker } from "./jobs/dailyTracker.js";
 
 // Routes
 import authRoutes from "./routes/auth.routes.js";
@@ -80,9 +79,6 @@ if (process.env.NODE_ENV !== "test") {
       .connect(process.env.MONGODB_URI)
       .then(() => {
         console.log("[DB] Connected to MongoDB successfully");
-
-        // Initialize cron jobs only after DB connection
-        initDailyTracker();
       })
       .catch((err) => {
         console.error("[DB] MongoDB connection error:", err.message);

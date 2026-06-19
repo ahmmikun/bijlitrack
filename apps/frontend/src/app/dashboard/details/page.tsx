@@ -1,7 +1,8 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
+import { fetchAllCCMSData } from '@/lib/ccms';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +25,15 @@ export default function ReferenceDetailsPage() {
   const refId = searchParams.get('ref');
   const { setActiveRefId } = useAuth();
 
+  // Get reference info (to know the referenceNo)
+  const { data: references } = useQuery({
+    queryKey: ['my-references-list'],
+    queryFn: async () => {
+      const res = await api.get('/reference/my');
+      return Array.isArray(res.data) ? res.data : [];
+    }
+  });
+
   const { data: details, isLoading, error, refetch, isRefetching } = useQuery({
     queryKey: ['reference-details', refId],
     queryFn: async () => {
@@ -35,15 +45,21 @@ export default function ReferenceDetailsPage() {
   });
 
   const handleManualSync = async () => {
-    const toastId = toast.loading("Fetching latest updates...");
+    const ref = references?.find((r: any) => r._id === refId);
+    if (!ref) return;
+
+    const toastId = toast.loading("Fetching latest data from CCMS...");
     try {
-      await api.post(`/reference/${refId}/sync`);
-      toast.success("Account data updated");
+      const ccmsData = await fetchAllCCMSData(ref.referenceNo);
+      await api.post(`/dashboard/${refId}/save`, {
+        consumerInfo: ccmsData.user,
+        billingInfo: ccmsData.bill,
+        outageInfo: ccmsData.loadInfo
+      });
+      toast.success("Account data updated", { id: toastId });
       refetch();
     } catch (err: any) {
-      toast.error("Failed to update data");
-    } finally {
-      toast.dismiss(toastId);
+      toast.error(err.message || "Failed to update data", { id: toastId });
     }
   };
 

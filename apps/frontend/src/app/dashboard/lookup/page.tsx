@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { fetchAllCCMSData } from '@/lib/ccms';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,15 +31,23 @@ export default function LookupPage() {
     setIsLoading(true);
 
     try {
-      const res = await api.post('/reference/lookup', { referenceNo });
-      if (res.data.success) {
-        setLookupResult(res.data.data);
-        toast.success("Bill data fetched successfully");
-      } else {
-        throw new Error(res.data.message || "Failed to fetch details");
+      // Fetch directly from CCMS (client-side)
+      const data = await fetchAllCCMSData(referenceNo);
+      
+      if (!data.user && !data.bill) {
+        throw new Error(data.errors.user || data.errors.bill || 'Failed to fetch details');
       }
+
+      setLookupResult({
+        referenceNo,
+        user: data.user,
+        bill: data.bill,
+        schedule: data.loadInfo,
+        timestamp: new Date().toISOString()
+      });
+      toast.success("Data fetched successfully");
     } catch (err: any) {
-      const msg = err.response?.data?.message || err.message || 'Utility provider not responding. Please try again.';
+      const msg = err.message || 'Utility provider not responding. Please try again.';
       setError(msg);
       toast.error(msg);
     } finally {
@@ -49,7 +58,19 @@ export default function LookupPage() {
   const handleTrack = async () => {
     setIsTracking(true);
     try {
-      await api.post('/reference/track', { referenceNo, consentGiven: true, trackingDays });
+      // 1. Register the reference in backend
+      const trackRes = await api.post('/reference/track', { referenceNo, consentGiven: true, trackingDays });
+      const refId = trackRes.data._id;
+
+      // 2. Save the already-fetched lookup data as initial snapshot
+      if (lookupResult && refId) {
+        await api.post(`/dashboard/${refId}/save`, {
+          consumerInfo: lookupResult.user,
+          billingInfo: lookupResult.bill,
+          outageInfo: lookupResult.schedule
+        });
+      }
+
       toast.success(`Outage tracking activated for ${trackingDays} days!`);
       router.push('/dashboard');
     } catch (err: any) {

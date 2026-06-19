@@ -3,7 +3,6 @@ import { ConsumerSnapshot } from '../models/ConsumerSnapshot.js';
 import { BillHistory } from '../models/BillHistory.js';
 import { OutageHistory } from '../models/OutageHistory.js';
 import { AnalysisReport } from '../models/AnalysisReport.js';
-import { performSync } from '../services/sync.service.js';
 
 /**
  * Helper to ensure the user owns the reference
@@ -17,38 +16,20 @@ const verifyOwnership = async (userId, referenceId) => {
 };
 
 /**
- * Get full dashboard summary for a reference
+ * Get latest saved snapshot for a reference (no CCMS calls)
  */
 export const getDashboardSummary = async (req, res) => {
-  console.log(`[Dashboard] Summary request for refId: ${req.params.referenceId} by userId: ${req.user.id}`);
+  console.log(`[Dashboard] Summary request for refId: ${req.params.referenceId}`);
 
   try {
-    const reference = await verifyOwnership(req.user.id, req.params.referenceId);
+    await verifyOwnership(req.user.id, req.params.referenceId);
 
-    // Get the latest snapshot
-    let latestSnapshot = await ConsumerSnapshot.findOne({ referenceId: req.params.referenceId })
+    const latestSnapshot = await ConsumerSnapshot.findOne({ referenceId: req.params.referenceId })
       .sort({ scrapedAt: -1 })
       .lean();
 
-    // AUTO-REFRESH LOGIC:
-    // If no snapshot exists, or if it's older than 1 hour, try to refresh it in real-time
-    const ONE_HOUR = 60 * 60 * 1000;
-    const isStale = !latestSnapshot || (new Date() - new Date(latestSnapshot.scrapedAt) > ONE_HOUR);
-
-    if (isStale) {
-      try {
-        console.log(`[Dashboard] Auto-refreshing stale data for ${reference.referenceNo}...`);
-        latestSnapshot = await performSync(reference, req.user.id);
-        console.log(`[Dashboard] Auto-refresh completed for ${reference.referenceNo}`);
-      } catch (syncError) {
-        console.error(`[Dashboard] Auto-refresh failed for ${reference.referenceNo}:`, syncError.message);
-        // If sync fails, we still continue with old data if available
-      }
-    }
-
     if (!latestSnapshot) {
-      console.log(`[Dashboard] No data available yet for refId: ${req.params.referenceId}`);
-      return res.json({ message: 'No data available yet. Tracking might be pending.' });
+      return res.json({ message: 'No data saved yet. Please sync from the app.' });
     }
 
     res.json({
@@ -60,74 +41,142 @@ export const getDashboardSummary = async (req, res) => {
       lastUpdated: latestSnapshot.scrapedAt
     });
   } catch (error) {
-    console.error(`[Dashboard] Summary error for refId ${req.params.referenceId}:`, error.message);
+    console.error(`[Dashboard] Summary error:`, error.message);
     res.status(404).json({ message: error.message });
   }
 };
 
 /**
- * Get billing details and history
+ * Save snapshot from frontend (frontend fetches CCMS, sends data here to store)
+ */
+export const saveSnapshot = async (req, res) => {
+  console.log(`[Dashboard] Save snapshot for refId: ${req.params.referenceId}`);
+
+  try {
+    const reference = await verifyOwnership(req.user.id, req.params.referenceId);
+    const { consumerInfo, billingInfo, outageInfo } = req.body;
+
+    if (!consumerInfo && !billingInfo && !outageInfo) {
+      return res.status(400).json({ message: 'No data provided to save' });
+    }
+
+    // Save snapshot
+    const snapshot = new ConsumerSnapshot({
+      userId: req.user.id,
+      referenceId: reference._id,
+      consumerInfo: consumerInfo || null,
+      billingInfo: billingInfo || null,
+      feederInfo: outageInfo ? {
+        code: outageInfo.feederCode,
+        name: outageInfo.feederName,
+        grid: outageInfo.gridStation,
+      } : null,
+      loadManagementInfo: outageInfo || null,
+      outageInfo: outageInfo || null,
+      scrapedAt: new Date()
+    });
+    await snapshot.save();
+
+    // Upsert bill history if billing data provided
+    if (billingInfo?.histInfo) {
+      const hist = billingInfo.histInfo;
+      const promises = [];
+      for (let i = 1; i <= 13; i++) {
+        const month = hist[`gbHistMM${i}`];
+        const amount = hist[`gbHistAssment${i}`];
+        const payment = hist[`payment${i}`];
+        if (month) {
+          promises.push(BillHistory.findOneAndUpdate(
+            { referenceId: reference._id, billMonth: month },
+            { userId: req.user.id, amountDue: parseFloat(amount) || 0, status: payment ? 'Paid' : 'Unpaid', scrapedAt: new Date() },
+            { upsert: true }
+          ));
+        }
+      }
+      await Promise.all(promises);
+    }
+
+    // Save outage records if outage data provided
+    if (outageInfo?.days) {
+      const outagePromises = [];
+      for (const [dateStr, dayData] of Object.entries(outageInfo.days)) {
+        const dayDate = new Date(dateStr + 'T00:00:00');
+        const nextDay = new Date(dayDate.getTime() + 24 * 60 * 60 * 1000);
+        outagePromises.push(OutageHistory.findOneAndUpdate(
+          { referenceId: reference._id, date: { $gte: dayDate, $lt: nextDay } },
+          {
+            userId: req.user.id,
+            referenceId: reference._id,
+            feederCode: outageInfo.feederCode,
+            feederName: outageInfo.feederName,
+            date: dayDate,
+            feederStatus: outageInfo.currentStatus,
+            hourlyOutageMinutes: dayData.hourlyOutageMinutes || [],
+            hourlyStatus: dayData.hourlyStatus || [],
+            totalOutageMinutes: dayData.totalOutageMinutes || 0,
+            actualOutageHours: dayData.totalOutageHours || 0,
+            scrapedAt: new Date()
+          },
+          { upsert: true }
+        ));
+      }
+      await Promise.all(outagePromises);
+    }
+
+    // Update reference lastCheckedAt
+    reference.lastCheckedAt = new Date();
+    if (outageInfo?.feederCode) reference.feederCode = outageInfo.feederCode;
+    await reference.save();
+
+    console.log(`[Dashboard] Snapshot saved for ${reference.referenceNo}`);
+    res.json({ message: 'Data saved successfully', lastUpdated: snapshot.scrapedAt });
+  } catch (error) {
+    console.error(`[Dashboard] Save snapshot error:`, error.message);
+    res.status(500).json({ message: 'Error saving data', error: error.message });
+  }
+};
+
+/**
+ * Get billing history from DB
  */
 export const getBillingHistory = async (req, res) => {
-  console.log(`[Dashboard] Billing history request for refId: ${req.params.referenceId}`);
-
   try {
     await verifyOwnership(req.user.id, req.params.referenceId);
-
     const history = await BillHistory.find({ referenceId: req.params.referenceId })
-      .sort({ billMonth: -1 }) // Assuming sortable format or date
-      .limit(12);
-
-    console.log(`[Dashboard] Returned ${history.length} billing records for refId: ${req.params.referenceId}`);
+      .sort({ billMonth: -1 })
+      .limit(13);
     res.json(history);
   } catch (error) {
-    console.error(`[Dashboard] Billing history error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
 };
 
 /**
- * Get outage and feeder history
+ * Get outage history from DB
  */
 export const getOutageHistory = async (req, res) => {
-  console.log(`[Dashboard] Outage history request for refId: ${req.params.referenceId}`);
-
   try {
     await verifyOwnership(req.user.id, req.params.referenceId);
-
     const history = await OutageHistory.find({ referenceId: req.params.referenceId })
       .sort({ date: -1 })
-      .limit(30); // Last 30 days
-
-    console.log(`[Dashboard] Returned ${history.length} outage records for refId: ${req.params.referenceId}`);
+      .limit(30);
     res.json(history);
   } catch (error) {
-    console.error(`[Dashboard] Outage history error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
-};;
+};
 
 /**
  * Get latest analysis report
  */
 export const getLatestReport = async (req, res) => {
-  console.log(`[Dashboard] Report request for refId: ${req.params.referenceId}`);
-
   try {
     await verifyOwnership(req.user.id, req.params.referenceId);
-
     const report = await AnalysisReport.findOne({ referenceId: req.params.referenceId })
       .sort({ generatedAt: -1 });
-
-    if (!report) {
-      console.log(`[Dashboard] No report available for refId: ${req.params.referenceId}`);
-      return res.json({ message: 'No report generated yet.' });
-    }
-
-    console.log(`[Dashboard] Report returned for refId: ${req.params.referenceId}`);
+    if (!report) return res.json({ message: 'No report generated yet.' });
     res.json(report);
   } catch (error) {
-    console.error(`[Dashboard] Report error for refId ${req.params.referenceId}:`, error.message);
     res.status(404).json({ message: error.message });
   }
 };
