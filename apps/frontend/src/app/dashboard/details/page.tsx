@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { fetchAllCCMSData } from '@/lib/ccms';
+import { fetchAllCCMSData, fetchLoadInfo } from '@/lib/ccms';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,6 +63,16 @@ export default function ReferenceDetailsPage() {
     }
   };
 
+  // Live load info from CCMS (refreshes every 5 min) for schedule/outage section
+  const currentRefNo = references?.find((r: any) => r._id === refId)?.referenceNo;
+  const { data: liveLoadInfo } = useQuery({
+    queryKey: ['live-load-details', currentRefNo],
+    queryFn: () => fetchLoadInfo(currentRefNo!),
+    enabled: !!currentRefNo,
+    refetchInterval: 5 * 60 * 1000,
+    staleTime: 2 * 60 * 1000,
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6 sm:space-y-8 w-full max-w-7xl mx-auto">
@@ -105,7 +115,9 @@ export default function ReferenceDetailsPage() {
   const consumer = details.consumerInfo || {};
   const bill = details.billingInfo?.basicInfo || {};
   const feeder = details.outageInfo || {};
-  const isOnline = feeder.currentStatus === 'ON';
+  // Use live status if available, otherwise stored snapshot
+  const currentStatus = liveLoadInfo?.currentStatus || feeder.currentStatus;
+  const isOnline = currentStatus === 'ON';
 
   return (
     <div className="space-y-6 sm:space-y-8 max-w-5xl mx-auto pb-16 animate-in fade-in duration-1000 w-full overflow-x-hidden">
@@ -257,7 +269,7 @@ export default function ReferenceDetailsPage() {
               <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest mb-2 relative z-10">Grid Signal</p>
               <div className="flex items-center gap-2 relative z-10">
                 <div className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500 animate-ping'} shrink-0`}></div>
-                <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{feeder.currentStatus || 'OFFLINE'}</p>
+                <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{currentStatus || 'OFFLINE'}</p>
               </div>
             </div>
 
@@ -283,11 +295,11 @@ export default function ReferenceDetailsPage() {
               <div className="grid grid-cols-2 gap-4 pt-3">
                 <div className="text-center">
                   <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-80 mb-0.5">Voltage</p>
-                  <p className="text-lg font-bold font-mono text-foreground">{feeder.voltage || '0'} <span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">kV</span></p>
+                  <p className="text-lg font-bold font-mono text-foreground">{liveLoadInfo?.voltage || feeder.voltage || '0'} <span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">kV</span></p>
                 </div>
                 <div className="text-center border-l border-border">
                   <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-widest opacity-80 mb-0.5">P. Factor</p>
-                  <p className="text-lg font-bold font-mono text-foreground">{feeder.powerFactor || '0'}<span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">%</span></p>
+                  <p className="text-lg font-bold font-mono text-foreground">{liveLoadInfo?.powerFactor || feeder.powerFactor || '0'}<span className="text-[9px] font-sans text-muted-foreground uppercase ml-0.5">%</span></p>
                 </div>
               </div>
             </div>
@@ -445,8 +457,8 @@ export default function ReferenceDetailsPage() {
             </CardHeader>
             <CardContent className="p-6">
               {(() => {
-                // Try new format first (from parseLoadInfo)
-                const loadInfo = details.loadManagementInfo || details.outageInfo;
+                // Use LIVE data from CCMS, fallback to stored snapshot
+                const loadInfo = liveLoadInfo || details.loadManagementInfo || details.outageInfo;
                 const schedule = loadInfo?.todaySchedule || [];
                 const days = loadInfo?.days || {};
                 const dayKeys = Object.keys(days).sort().reverse();

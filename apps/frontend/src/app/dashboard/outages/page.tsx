@@ -31,8 +31,20 @@ export default function OutagesPage() {
     }
   });
 
-  const { data: outageHistory, isLoading } = useQuery({
-    queryKey: ['outage-history', activeRef],
+  const currentRefNo = references?.find((r: any) => r._id === activeRef)?.referenceNo;
+
+  // Fetch LIVE outage data directly from CCMS (refreshes every 5 minutes)
+  const { data: liveLoadInfo, isLoading: isLoadingLive } = useQuery({
+    queryKey: ['live-outage-data', currentRefNo],
+    queryFn: () => fetchLoadInfo(currentRefNo!),
+    enabled: !!currentRefNo,
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+    staleTime: 2 * 60 * 1000, // Consider fresh for 2 minutes
+  });
+
+  // Also get historical data from DB (for older records beyond what CCMS returns)
+  const { data: dbOutageHistory } = useQuery({
+    queryKey: ['outage-history-db', activeRef],
     queryFn: async () => {
       if (!activeRef) return [];
       const res = await api.get(`/dashboard/${activeRef}/outages`);
@@ -41,21 +53,47 @@ export default function OutagesPage() {
     enabled: !!activeRef
   });
 
-  const handleSync = async () => {
-    if (!activeRef) return;
-    const ref = references?.find((r: any) => r._id === activeRef);
-    if (!ref) return;
+  // Merge: use live CCMS data for recent days, DB for older records
+  const outageHistory = (() => {
+    const records: any[] = [];
+    
+    // Add live CCMS data (today + last few days)
+    if (liveLoadInfo?.days) {
+      for (const [date, dayData] of Object.entries(liveLoadInfo.days)) {
+        records.push({ _id: `live-${date}`, date, ...(dayData as any), feederName: liveLoadInfo.feederName, feederStatus: liveLoadInfo.currentStatus });
+      }
+    }
 
+    // Add older DB records that aren't in live data
+    if (dbOutageHistory && Array.isArray(dbOutageHistory)) {
+      const liveDates = new Set(records.map(r => r.date?.split('T')?.[0] || r.date));
+      for (const dbRecord of dbOutageHistory) {
+        const dbDate = new Date(dbRecord.date).toISOString().split('T')[0];
+        if (!liveDates.has(dbDate)) {
+          records.push(dbRecord);
+        }
+      }
+    }
+
+    // Sort by date descending (newest first)
+    return records.sort((a, b) => {
+      const dateA = new Date(a.date).getTime();
+      const dateB = new Date(b.date).getTime();
+      return dateB - dateA;
+    });
+  })();
+
+  const isLoading = isLoadingLive && !dbOutageHistory;
+
+  const handleSync = async () => {
+    if (!activeRef || !currentRefNo) return;
     const toastId = toast.loading("Fetching latest outage data from CCMS...");
     try {
-      // Fetch directly from CCMS (client-side)
-      const loadInfo = await fetchLoadInfo(ref.referenceNo);
-      
-      // Save to backend
+      const loadInfo = await fetchLoadInfo(currentRefNo);
       await api.post(`/dashboard/${activeRef}/save`, { outageInfo: loadInfo });
-
       toast.success("Outage data synced!", { id: toastId });
-      queryClient.invalidateQueries({ queryKey: ['outage-history', activeRef] });
+      queryClient.invalidateQueries({ queryKey: ['live-outage-data', currentRefNo] });
+      queryClient.invalidateQueries({ queryKey: ['outage-history-db', activeRef] });
     } catch (err: any) {
       toast.error(err.message || "Sync failed", { id: toastId });
     }
