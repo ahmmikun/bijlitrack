@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { fetchAllCCMSData } from '@/lib/ccms';
+import { fetchAllCCMSData, fetchFeederStatus } from '@/lib/ccms';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,17 @@ export default function DashboardOverview() {
       }));
       return detailedRefs;
     }
+  });
+
+  // Live feeder status polling every 3 minutes for active reference
+  const activeRef = references?.find((r: any) => r._id === activeRefId);
+  const { data: liveStatus } = useQuery({
+    queryKey: ['live-feeder-status', activeRef?.referenceNo],
+    queryFn: () => fetchFeederStatus(activeRef!.referenceNo),
+    enabled: !!activeRef?.referenceNo,
+    refetchInterval: 3 * 60 * 1000, // Every 3 minutes
+    refetchIntervalInBackground: false,
+    retry: 1,
   });
 
   const handleSync = async (id: string, referenceNo: string) => {
@@ -165,8 +176,10 @@ export default function DashboardOverview() {
             const bill = details.billingInfo?.basicInfo;
             const feeder = details.outageInfo;
             const consumer = details.consumerInfo;
-            const isOnline = feeder?.currentStatus === 'ON';
             const isActive = activeRefId === ref._id;
+            // Use live polled status if this is the active reference, otherwise use saved snapshot
+            const currentFeederStatus = (isActive && liveStatus) ? liveStatus.currentStatus : feeder?.currentStatus;
+            const isOnline = currentFeederStatus === 'ON';
 
             return (
               <div 
@@ -207,7 +220,7 @@ export default function DashboardOverview() {
                     </div>
                     <div className="flex flex-col items-end gap-2 shrink-0 ml-4">
                       <Badge variant={isOnline ? "default" : "destructive"} className={`${isOnline ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20 hover:bg-green-500/20" : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20 hover:bg-red-500/20"} font-semibold text-xs px-3 py-1 rounded-full border`}>
-                        {feeder?.currentStatus || 'OFF'}
+                        {currentFeederStatus || 'OFF'}
                       </Badge>
                       <span className="text-xs text-muted-foreground/60">Power Status</span>
                     </div>

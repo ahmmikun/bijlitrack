@@ -52,6 +52,28 @@ const parseLoadInfo = (feederData: any) => {
     }
   }
 
+  // Add today's tripping data as today's record (real-time outage for current day)
+  if (feederData.tripping && Array.isArray(feederData.tripping)) {
+    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const hourlyMinutes = feederData.tripping as number[];
+    const totalOutageMinutes = hourlyMinutes.reduce((sum: number, v: number) => sum + v, 0);
+
+    // Only add/override if tripping has any data or today isn't already in history_data
+    if (totalOutageMinutes > 0 || !result.days[today]) {
+      result.days[today] = {
+        date: today,
+        hourlyOutageMinutes: hourlyMinutes,
+        totalOutageMinutes,
+        totalOutageHours: parseFloat((totalOutageMinutes / 60).toFixed(2)),
+        hourlyStatus: hourlyMinutes.map((mins: number) => {
+          if (mins === 0) return 'ON';
+          if (mins >= 60) return 'OFF';
+          return 'PARTIAL';
+        }),
+      };
+    }
+  }
+
   return result;
 };
 
@@ -63,6 +85,27 @@ export const fetchUserDetails = async (referenceNo: string) => {
   const data = await res.json();
   if (data.message !== 'Success') throw new Error(data.message || 'User not found');
   return data.user;
+};
+
+/**
+ * Fetch just the feeder status (lightweight, for live polling)
+ * Returns: { currentStatus, voltage, powerFactor, currentStatusTime, feederName }
+ */
+export const fetchFeederStatus = async (referenceNo: string) => {
+  const res = await fetch(`${CCMS_BASE}/get-loadinfo/${referenceNo}`);
+  const data = await res.json();
+  if (data.message !== 'Success' || !data.load?.[0]?.response?.data?.[0]) {
+    throw new Error('Status unavailable');
+  }
+  const d = data.load[0].response.data[0];
+  return {
+    currentStatus: d.current_status || 'OFF',
+    currentStatusTime: d.current_status_time || null,
+    voltage: d.voltage || 0,
+    powerFactor: d.power_factor || 0,
+    activePower: d.active_power_kW || 0,
+    feederName: d.feeder || null,
+  };
 };
 
 /**
