@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
@@ -8,9 +9,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from '@/components/ui/skeleton';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { AlertCircle, History, Receipt, Info, TrendingUp, Calendar, CalendarClock } from 'lucide-react';
+import { AlertCircle, History, Receipt, Info, TrendingUp, Calendar, CalendarClock, ExternalLink, Printer } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export default function BillingPage() {
   const searchParams = useSearchParams();
@@ -94,6 +96,9 @@ export default function BillingPage() {
       </div>
 
       <div className="grid gap-8 sm:gap-12">
+        {/* Print Bill Section */}
+        <BillPrintSection />
+
         {/* Chart Card */}
         <Card className="border-border shadow-2xl shadow-foreground/5 bg-card rounded-3xl sm:rounded-[3rem] overflow-hidden group">
           <CardHeader className="p-6 sm:p-10 border-b border-border bg-muted/20">
@@ -223,5 +228,70 @@ export default function BillingPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function BillPrintSection() {
+  const [selectedCompany, setSelectedCompany] = useState('lesco');
+
+  const companies = [
+    { code: 'lesco', name: 'LESCO', fullName: 'Lahore Electric Supply Company', color: '#0ea5e9' },
+    { code: 'gepco', name: 'GEPCO', fullName: 'Gujranwala Electric Power Company', color: '#22c55e' },
+    { code: 'fesco', name: 'FESCO', fullName: 'Faisalabad Electric Supply Company', color: '#f59e0b' },
+    { code: 'iesco', name: 'IESCO', fullName: 'Islamabad Electric Supply Company', color: '#6366f1' },
+    { code: 'mepco', name: 'MEPCO', fullName: 'Multan Electric Power Company', color: '#14b8a6' },
+    { code: 'pesco', name: 'PESCO', fullName: 'Peshawar Electric Supply Company', color: '#ec4899' },
+    { code: 'hazeco', name: 'HAZECO', fullName: 'Hazara Electric Supply Company', color: '#8b5cf6' },
+    { code: 'hesco', name: 'HESCO', fullName: 'Hyderabad Electric Supply Company', color: '#ef4444' },
+    { code: 'sepco', name: 'SEPCO', fullName: 'Sukkur Electric Power Company', color: '#06b6d4' },
+    { code: 'qesco', name: 'QESCO', fullName: 'Quetta Electric Supply Company', color: '#84cc16' },
+    { code: 'tesco', name: 'TESCO', fullName: 'Tribal Electric Supply Company', color: '#f97316' },
+  ];
+
+  const handleGo = () => {
+    window.open(`https://bill.pitc.com.pk/${selectedCompany}bill`, '_blank');
+  };
+
+  return (
+    <Card className="border-border shadow-2xl shadow-foreground/5 bg-card rounded-3xl sm:rounded-[3rem] overflow-hidden">
+      <CardHeader className="p-6 sm:p-10 border-b border-border bg-muted/20">
+        <div className="flex justify-between items-center gap-4">
+          <div className="space-y-1">
+            <CardTitle className="text-xl sm:text-2xl font-black tracking-tight uppercase flex items-center gap-3">
+              <Printer className="h-5 w-5 text-primary" />
+              Print Official Bill
+            </CardTitle>
+            <CardDescription className="font-bold text-muted-foreground uppercase text-[9px] sm:text-[10px] tracking-widest mt-1">
+              Get a printable copy from PITB official portal
+            </CardDescription>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="p-6 sm:p-10">
+        <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="flex-1 space-y-2 w-full">
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Select Your Company</label>
+            <select
+              value={selectedCompany}
+              onChange={(e) => setSelectedCompany(e.target.value)}
+              className="w-full h-12 px-4 bg-background border border-border rounded-xl text-sm font-semibold text-foreground appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+            >
+              {companies.map(c => (
+                <option key={c.code} value={c.code}>{c.name} — {c.fullName}</option>
+              ))}
+            </select>
+          </div>
+          <Button
+            onClick={handleGo}
+            className="h-12 px-8 bg-primary hover:opacity-90 text-primary-foreground font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 border-0 gap-2 w-full sm:w-auto shrink-0"
+          >
+            <ExternalLink className="h-4 w-4" /> Go to Bill
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground/60 mt-3 font-medium">
+          Opens the official PITB bill portal where you can view and print your latest electricity bill.
+        </p>
+      </CardContent>
+    </Card>
   );
 }
