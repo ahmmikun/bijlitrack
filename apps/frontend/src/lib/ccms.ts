@@ -58,7 +58,8 @@ const parseLoadInfo = (feederData: any) => {
     const hourlyMinutes = feederData.tripping as number[];
     const totalOutageMinutes = hourlyMinutes.reduce((sum: number, v: number) => sum + v, 0);
 
-    // Only add/override if tripping has any data or today isn't already in history_data
+    // Override today's record with tripping if tripping has outage data
+    // (tripping is more real-time than history_data for today)
     if (totalOutageMinutes > 0 || !result.days[today]) {
       result.days[today] = {
         date: today,
@@ -71,6 +72,36 @@ const parseLoadInfo = (feederData: any) => {
           return 'PARTIAL';
         }),
       };
+    }
+  }
+
+  // Parse maintenance_data — scheduled load shedding per day (includes tomorrow)
+  if (feederData.maintenance_data) {
+    for (const [key, values] of Object.entries(feederData.maintenance_data)) {
+      const dateStr = key.replace('dt_', '');
+      const year = dateStr.slice(0, 4);
+      const month = dateStr.slice(4, 6);
+      const day = dateStr.slice(6, 8);
+      const date = `${year}-${month}-${day}`;
+
+      const hourlyMinutes = Array.isArray(values) ? values as number[] : [];
+      const totalScheduledMinutes = hourlyMinutes.reduce((sum, v) => sum + v, 0);
+
+      // If this date doesn't have a record yet (e.g. tomorrow), add it
+      if (!result.days[date]) {
+        result.days[date] = {
+          date,
+          hourlyOutageMinutes: hourlyMinutes, // scheduled = expected outage
+          totalOutageMinutes: totalScheduledMinutes,
+          totalOutageHours: parseFloat((totalScheduledMinutes / 60).toFixed(2)),
+          hourlyStatus: hourlyMinutes.map(mins => {
+            if (mins === 0) return 'ON';
+            if (mins >= 60) return 'OFF';
+            return 'PARTIAL';
+          }),
+          isScheduled: true, // Flag to differentiate from actual data
+        };
+      }
     }
   }
 
