@@ -40,27 +40,48 @@ bijlitrack-monorepo/
 
 **Monorepo** managed with npm workspaces. Run both apps with a single command.
 
+### Data Flow
+
+```
+User's Browser (Pakistani IP)
+├── Calls CCMS APIs directly (bypasses geo-blocking)
+│   ├── GET /api/details/user?reference=...
+│   ├── GET /api/details/bill?reference=...
+│   └── GET /get-loadinfo/...
+│
+└── Sends data to Backend (Railway)
+    ├── POST /dashboard/:refId/save    ← Store snapshot
+    ├── GET  /dashboard/:refId         ← Retrieve stored data
+    ├── Auth (signup/login/me)
+    └── Reference management
+```
+
 ---
 
 ## 🛠️ Tech Stack
 
 ### Backend
-- **Express.js** — REST API
-- **MongoDB** (Mongoose) — Data persistence
-- **JWT** — Authentication (7-day tokens)
+- **Express.js 4.19** — REST API (ES Modules)
+- **MongoDB** (Mongoose 8.4) — Data persistence (Atlas)
+- **JWT** (jsonwebtoken) — Authentication (7-day tokens)
+- **bcrypt** — Password hashing
 - **node-cron** — Daily outage tracking scheduler
 - **cheerio** — HTML parsing for complaint history
+- **Vitest** — Testing framework
 - **CCMS/PITC APIs** — Data source (get-loadinfo, user details, bill details)
 
 ### Frontend
-- **Next.js 16** — App Router, Turbopack
-- **React 19** — UI rendering
-- **Tailwind CSS 4** + **shadcn/ui** — Styling and components
-- **TanStack React Query** — Server state management
-- **Recharts** — Charts and graphs
+- **Next.js 16.2.9** — App Router, Turbopack
+- **React 19.2** — UI rendering
+- **TypeScript 5** — Type safety
+- **Tailwind CSS 4** + **shadcn/ui** + **Radix UI** — Styling and components
+- **TanStack React Query 5** — Server state management
+- **Recharts 3** — Charts and graphs
 - **Axios** — HTTP client
+- **React Hook Form 7** + **Zod 4** — Form validation
 - **Sonner** — Toast notifications
 - **next-themes** — Dark/light mode
+- **Lucide React** — Icons
 
 ---
 
@@ -89,6 +110,7 @@ Create `apps/backend/.env`:
 PORT=5000
 MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/bijlitrack
 JWT_SECRET=your-secret-key-here
+FRONTEND_URL=http://localhost:3000
 ```
 
 ### Running
@@ -111,26 +133,25 @@ npm run frontend   # Next.js on http://localhost:3000
 |--------|----------|-------------|
 | POST | `/api/auth/signup` | Register new user |
 | POST | `/api/auth/login` | Login, get JWT |
-| GET | `/api/auth/me` | Get current user |
+| GET | `/api/auth/me` | Get current user (protected) |
 
-### Reference Management
+### Reference Management (all protected)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/reference/lookup` | One-time bill lookup (public) |
-| POST | `/api/reference/track` | Start outage tracking (7/14/30 days) |
+| POST | `/api/reference/track` | Start tracking a reference number |
 | GET | `/api/reference/my` | Get user's tracked references |
-| POST | `/api/reference/:id/sync` | Manual data refresh |
-| DELETE | `/api/reference/:id` | Remove tracked reference |
+| DELETE | `/api/reference/:id` | Remove tracked reference + all data |
 
-### Dashboard
+### Dashboard (all protected)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| GET | `/api/dashboard/:refId` | Full summary (auto-refreshes if >1hr stale) |
+| GET | `/api/dashboard/:refId` | Get latest saved snapshot |
+| POST | `/api/dashboard/:refId/save` | Frontend sends CCMS data to store |
 | GET | `/api/dashboard/:refId/billing` | Bill history records |
 | GET | `/api/dashboard/:refId/outages` | Outage history with hourly data |
 | GET | `/api/dashboard/:refId/report` | Analysis report |
 
-### Complaints
+### Complaints (all protected)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/complaints/track-by-reference?referenceNo=...` | Complaint history by reference |
@@ -141,11 +162,12 @@ npm run frontend   # Next.js on http://localhost:3000
 ## 📊 How Outage Tracking Works
 
 1. User adds a 14-digit reference number and selects tracking duration (7/14/30 days)
-2. Initial sync fetches all data from CCMS `get-loadinfo` API
+2. Frontend fetches data directly from CCMS `get-loadinfo` API (client-side, avoids geo-blocking)
 3. The API returns `history_data` — hourly outage minutes for the last 3-4 days
-4. A daily cron job (3 AM) syncs outage data for all active references
-5. Over time, outage history accumulates in the database
-6. Users can export all tracked data as PDF
+4. Frontend sends this data to the backend for persistent storage via `/dashboard/:refId/save`
+5. Backend also has a sync service for server-side daily cron jobs
+6. Over time, outage history accumulates in the database
+7. Users can export all tracked data as PDF
 
 **Data format:** Each hour has a value 0-60 representing minutes of outage. Example:
 ```
@@ -171,6 +193,7 @@ BijliTrack works with all PITC/CCMS supported public-sector DISCOs:
 
 | Route | Page |
 |-------|------|
+| `/` | Landing page |
 | `/login` `/signup` | Authentication |
 | `/dashboard` | Overview with account cards |
 | `/dashboard/details` | Detailed account view (consumer, bill, feeder, schedule) |
@@ -181,6 +204,14 @@ BijliTrack works with all PITC/CCMS supported public-sector DISCOs:
 | `/dashboard/reports` | Analysis reports |
 | `/dashboard/about` | About, disclaimer, coverage info |
 | `/dashboard/settings` | User settings |
+
+---
+
+## 🚢 Deployment
+
+- **Backend**: Railway — Node.js, connects to MongoDB Atlas
+- **Frontend**: Railway — Next.js standalone build
+- CCMS calls happen from user's browser (not server) to avoid geo-blocking
 
 ---
 
