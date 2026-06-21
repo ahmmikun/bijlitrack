@@ -181,3 +181,74 @@ export const fetchAllCCMSData = async (referenceNo: string) => {
     }
   };
 };
+
+/**
+ * Parse complaint table HTML into structured data (client-side)
+ * Mirrors the backend cheerio logic but uses DOMParser for browser
+ */
+const parseComplaintHTML = (html: string) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const complaints: any[] = [];
+
+  const rows = doc.querySelectorAll('table#dynamic-table tbody tr');
+  rows.forEach((row) => {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 7) return;
+
+    const ticketNo = cells[0]?.textContent?.trim() || '';
+    const statusBadge = cells[1]?.querySelector('.badge')?.textContent?.trim() || '';
+    const reopened = cells[1]?.textContent?.includes('Reopened') || false;
+    const refNo = cells[2]?.textContent?.trim() || '';
+    const nature = cells[3]?.textContent?.trim() || '';
+    const type = cells[4]?.textContent?.trim() || '';
+    const source = cells[5]?.textContent?.trim() || '';
+    const feedback = cells[6]?.querySelector('.badge')?.textContent?.trim() || '';
+
+    // Parse history from last column
+    const historyCell = cells[7];
+    const historyEntries: string[] = [];
+    if (historyCell) {
+      const historyHTML = historyCell.innerHTML || '';
+      const parts = historyHTML.split(/<br\s*\/?>/i);
+      for (const part of parts) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = part;
+        const clean = tempDiv.textContent?.trim() || '';
+        if (clean) historyEntries.push(clean);
+      }
+    }
+
+    complaints.push({
+      ticketNo,
+      status: statusBadge,
+      reopened,
+      refNo,
+      nature,
+      type,
+      source,
+      feedback,
+      history: historyEntries,
+    });
+  });
+
+  return complaints;
+};
+
+/**
+ * Fetch complaints by reference number (client-side, avoids geo-blocking)
+ */
+export const fetchComplaintsByReference = async (referenceNo: string) => {
+  const res = await fetch(`${CCMS_BASE}/complainthistory?reference=${referenceNo}`);
+  const html = await res.text();
+  return parseComplaintHTML(html);
+};
+
+/**
+ * Fetch complaint by ticket number (client-side, avoids geo-blocking)
+ */
+export const fetchComplaintByTicket = async (ticketNo: string) => {
+  const res = await fetch(`${CCMS_BASE}/tracking/ticket?ticket_no=${ticketNo}`);
+  const html = await res.text();
+  return parseComplaintHTML(html);
+};

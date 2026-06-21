@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, MessageSquareWarning, Search, Info, TicketCheck, FileText, Loader2, Clock } from 'lucide-react';
 import api from '@/lib/api';
+import { fetchComplaintsByReference, fetchComplaintByTicket } from '@/lib/ccms';
 import { toast } from 'sonner';
 
 interface Complaint {
@@ -37,11 +38,19 @@ export default function ComplaintsPage() {
     setComplaints([]);
     setSearchType('reference');
     try {
-      const res = await api.get(`/complaints/track-by-reference?referenceNo=${referenceNo}`);
-      setComplaints(res.data.complaints || []);
-      if (res.data.complaints?.length === 0) toast.info("No complaints found for this reference");
+      // Fetch directly from CCMS (client-side) to avoid geo-blocking on production server
+      const results = await fetchComplaintsByReference(referenceNo);
+      setComplaints(results);
+      if (results.length === 0) toast.info("No complaints found for this reference");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch complaints");
+      // Fallback to backend in case CORS or other client-side issue
+      try {
+        const res = await api.get(`/complaints/track-by-reference?referenceNo=${referenceNo}`);
+        setComplaints(res.data.complaints || []);
+        if (res.data.complaints?.length === 0) toast.info("No complaints found for this reference");
+      } catch (fallbackErr: any) {
+        toast.error(fallbackErr.response?.data?.message || "Failed to fetch complaints");
+      }
     } finally {
       setIsLoadingRef(false);
     }
@@ -53,11 +62,19 @@ export default function ComplaintsPage() {
     setComplaints([]);
     setSearchType('ticket');
     try {
-      const res = await api.get(`/complaints/track-by-ticket?ticketNo=${ticketNo.trim()}`);
-      setComplaints(res.data.complaints || []);
-      if (res.data.complaints?.length === 0) toast.info("No complaint found with this ticket number");
+      // Fetch directly from CCMS (client-side) to avoid geo-blocking on production server
+      const results = await fetchComplaintByTicket(ticketNo.trim());
+      setComplaints(results);
+      if (results.length === 0) toast.info("No complaint found with this ticket number");
     } catch (err: any) {
-      toast.error(err.response?.data?.message || "Failed to fetch ticket");
+      // Fallback to backend in case CORS or other client-side issue
+      try {
+        const res = await api.get(`/complaints/track-by-ticket?ticketNo=${ticketNo.trim()}`);
+        setComplaints(res.data.complaints || []);
+        if (res.data.complaints?.length === 0) toast.info("No complaint found with this ticket number");
+      } catch (fallbackErr: any) {
+        toast.error(fallbackErr.response?.data?.message || "Failed to fetch ticket");
+      }
     } finally {
       setIsLoadingTicket(false);
     }
