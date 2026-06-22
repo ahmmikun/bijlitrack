@@ -461,16 +461,24 @@ export default function ReferenceDetailsPage() {
                 const loadInfo = liveLoadInfo || details.loadManagementInfo || details.outageInfo;
                 const schedule = loadInfo?.todaySchedule || [];
                 const days = loadInfo?.days || {};
+                
+                // Get TODAY's date in YYYY-MM-DD format (local timezone)
+                const today = new Date();
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                
+                // Use today's data specifically, not just the latest day (which could be tomorrow's maintenance forecast)
+                const todayData = days[todayStr] || null;
+                const hourlyMins = todayData?.hourlyOutageMinutes || [];
+                
+                // Keep dayKeys for display fallback
                 const dayKeys = Object.keys(days).sort().reverse();
-                const latestDay = dayKeys.length > 0 ? days[dayKeys[0]] : null;
-                const hourlyMins = latestDay?.hourlyOutageMinutes || [];
 
                 // Try old format
                 const oldMaintenance = Array.isArray(details.loadManagementInfo) && details.loadManagementInfo[0]?.maintenance_data;
                 const oldScheduleValues = oldMaintenance ? (Object.values(oldMaintenance)[0] as any[] || []) : [];
 
                 if (hourlyMins.length === 24) {
-                  // New format - show hourly outage minutes
+                  // New format - show hourly outage minutes for TODAY
                   const totalOff = hourlyMins.reduce((s: number, v: number) => s + v, 0);
                   return (
                     <div className="space-y-6">
@@ -480,7 +488,7 @@ export default function ReferenceDetailsPage() {
                           <p className="text-sm font-bold text-foreground">
                             {totalOff === 0 ? 'No outages recorded today' : `${Math.floor(totalOff/60)}h ${totalOff%60}m total outage today`}
                           </p>
-                          <p className="text-xs text-muted-foreground">Date: {dayKeys[0] || new Date().toISOString().split('T')[0]}</p>
+                          <p className="text-xs text-muted-foreground">Date: {todayStr}</p>
                         </div>
                       </div>
                       <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-12 gap-2 sm:gap-3">
