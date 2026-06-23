@@ -86,4 +86,73 @@ describe('Authentication API', () => {
     expect(res.status).toBe(401);
     expect(res.body.message).toBe('Invalid credentials');
   });
+
+  it('should generate a password reset link for an existing user', async () => {
+    await request(app).post('/api/auth/signup').send(testUser);
+
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: testUser.email });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('message');
+    expect(res.body).toHaveProperty('resetToken');
+    expect(res.body).toHaveProperty('resetUrl');
+  });
+
+  it('should not reveal whether a password reset email exists', async () => {
+    const res = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'missing@example.com' });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveProperty('message');
+    expect(res.body).not.toHaveProperty('resetToken');
+  });
+
+  it('should reset a password with a valid reset token', async () => {
+    await request(app).post('/api/auth/signup').send(testUser);
+
+    const forgotRes = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: testUser.email });
+
+    const resetRes = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token: forgotRes.body.resetToken,
+        password: 'newpassword123'
+      });
+
+    expect(resetRes.status).toBe(200);
+
+    const oldLogin = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: testUser.email,
+        password: testUser.password
+      });
+    expect(oldLogin.status).toBe(401);
+
+    const newLogin = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: testUser.email,
+        password: 'newpassword123'
+      });
+    expect(newLogin.status).toBe(200);
+    expect(newLogin.body).toHaveProperty('token');
+  });
+
+  it('should reject an invalid password reset token', async () => {
+    const res = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        token: 'invalid-token',
+        password: 'newpassword123'
+      });
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toMatch(/invalid or expired/i);
+  });
 });

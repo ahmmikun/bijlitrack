@@ -12,6 +12,15 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Zap, User, Mail, Lock, ArrowRight } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
+const getApiErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === 'object' && error !== null && 'response' in error) {
+    const response = (error as { response?: { data?: { message?: string } } }).response;
+    return response?.data?.message || fallback;
+  }
+
+  return fallback;
+};
+
 export default function SignupPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,8 +37,8 @@ export default function SignupPage() {
     try {
       const res = await api.post('/auth/signup', { name, email, password });
       login(res.data.token, res.data.user);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to create your account. Try another email.');
+    } catch (err: unknown) {
+      setError(getApiErrorMessage(err, 'Failed to create your account. Try another email.'));
     } finally {
       setIsLoading(false);
     }

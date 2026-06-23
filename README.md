@@ -111,7 +111,21 @@ PORT=5000
 MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/bijlitrack
 JWT_SECRET=your-secret-key-here
 FRONTEND_URL=http://localhost:3000
+
+# Password reset emails
+APP_NAME=BijliTrack
+MAIL_FROM="BijliTrack <no-reply@example.com>"
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=465
+SMTP_SECURE=true
+SMTP_USER=your-email@example.com
+SMTP_PASS=your-app-password
+
+# Development only. Keep false/omit in production.
+RETURN_PASSWORD_RESET_LINK=false
 ```
+
+For Gmail, `SMTP_PASS` should be an app password, not your normal Gmail password.
 
 ### Running
 
@@ -133,6 +147,8 @@ npm run frontend   # Next.js on http://localhost:3000
 |--------|----------|-------------|
 | POST | `/api/auth/signup` | Register new user |
 | POST | `/api/auth/login` | Login, get JWT |
+| POST | `/api/auth/forgot-password` | Email password reset link |
+| POST | `/api/auth/reset-password` | Set new password from reset token |
 | GET | `/api/auth/me` | Get current user (protected) |
 
 ### Reference Management (all protected)

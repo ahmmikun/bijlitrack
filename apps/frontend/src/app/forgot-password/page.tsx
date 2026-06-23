@@ -2,15 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Zap, Key, Mail, ArrowRight } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { ArrowRight, Mail, Zap } from 'lucide-react';
 
 const getApiErrorMessage = (error: unknown, fallback: string) => {
   if (typeof error === 'object' && error !== null && 'response' in error) {
@@ -21,23 +20,28 @@ const getApiErrorMessage = (error: unknown, fallback: string) => {
   return fallback;
 };
 
-export default function LoginPage() {
+export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  const [resetUrl, setResetUrl] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const { login } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
+    setResetUrl('');
     setIsLoading(true);
 
     try {
-      const res = await api.post('/auth/login', { email, password });
-      login(res.data.token, res.data.user);
+      const res = await api.post('/auth/forgot-password', { email });
+      setMessage(res.data.message || 'If this email exists, a reset link has been generated.');
+      if (res.data.resetUrl) {
+        setResetUrl(res.data.resetUrl);
+      }
     } catch (err: unknown) {
-      setError(getApiErrorMessage(err, 'Check your email/password and try again.'));
+      setError(getApiErrorMessage(err, 'Could not create a reset link. Please try again.'));
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +49,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4 transition-colors duration-300 relative overflow-hidden">
-      {/* Decorative background */}
       <div className="absolute top-0 left-0 w-full h-full pointer-events-none opacity-40">
         <div className="absolute top-[-10%] right-[-10%] w-96 h-96 bg-primary/10 blur-[100px] rounded-full"></div>
         <div className="absolute bottom-[-10%] left-[-10%] w-96 h-96 bg-blue-500/10 blur-[100px] rounded-full"></div>
@@ -61,9 +64,9 @@ export default function LoginPage() {
             <Zap className="h-8 w-8 text-primary-foreground fill-current" />
           </div>
           <div className="space-y-1">
-            <CardTitle className="text-3xl font-black tracking-tighter uppercase text-foreground">Welcome Back</CardTitle>
+            <CardTitle className="text-3xl font-black tracking-tighter uppercase text-foreground">Reset Password</CardTitle>
             <CardDescription className="font-bold text-[10px] uppercase tracking-[0.2em] text-muted-foreground opacity-60">
-              Access your electricity dashboard
+              Recover access to your account
             </CardDescription>
           </div>
         </CardHeader>
@@ -74,55 +77,53 @@ export default function LoginPage() {
                 <AlertDescription className="font-bold text-center text-xs tracking-tight">{error}</AlertDescription>
               </Alert>
             )}
+            {message && (
+              <Alert className="rounded-2xl bg-primary/5 border-primary/20 py-4">
+                <AlertDescription className="font-bold text-center text-xs tracking-tight text-foreground">
+                  {message}
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="space-y-2.5">
               <Label htmlFor="email" className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Email Address</Label>
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="name@company.com" 
-                  required 
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="name@company.com"
+                  required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-12 h-14 bg-muted/30 border-border rounded-2xl focus:ring-4 focus:ring-primary/10 transition-all font-medium"
                 />
               </div>
             </div>
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between gap-4">
-                <Label htmlFor="password" title="password" className="text-[10px] font-black uppercase tracking-widest ml-1 text-muted-foreground">Security Password</Label>
-                <Link href="/forgot-password" className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline">
-                  Forgot?
-                </Link>
-              </div>
-              <div className="relative group">
-                <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input 
-                  id="password" 
-                  type="password" 
-                  placeholder="••••••••"
-                  required 
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-12 h-14 bg-muted/30 border-border rounded-2xl focus:ring-4 focus:ring-primary/10 transition-all font-medium"
-                />
-              </div>
-            </div>
             <Button type="submit" className="w-full bg-primary hover:opacity-90 text-primary-foreground font-black h-14 rounded-2xl text-sm shadow-xl shadow-primary/20 transition-all active:scale-95 border-0 uppercase tracking-widest" disabled={isLoading}>
-              {isLoading ? 'Authenticating...' : (
+              {isLoading ? 'Generating...' : (
                 <span className="flex items-center gap-2">
-                    Login to System <ArrowRight className="h-4 w-4" />
+                  Generate Reset Link <ArrowRight className="h-4 w-4" />
                 </span>
               )}
             </Button>
           </form>
+
+          {resetUrl && (
+            <div className="mt-6 rounded-2xl border border-border bg-muted/30 p-4 text-center space-y-3">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Development Reset Link</p>
+              <Link href={resetUrl}>
+                <Button variant="outline" className="w-full rounded-xl font-black uppercase tracking-widest text-xs">
+                  Open Reset Page
+                </Button>
+              </Link>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="flex flex-col space-y-4 text-center pb-10">
           <div className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-            Don&apos;t have an account?{' '}
-            <Link href="/signup" className="text-primary hover:underline ml-1">
-              Create one now
+            Remembered it?{' '}
+            <Link href="/login" className="text-primary hover:underline ml-1">
+              Back to login
             </Link>
           </div>
         </CardFooter>
