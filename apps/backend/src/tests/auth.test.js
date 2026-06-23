@@ -98,6 +98,7 @@ describe('Authentication API', () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('message');
+    expect(res.body.emailSent).toBe(false);
     expect(res.body).toHaveProperty('resetToken');
     expect(res.body).toHaveProperty('resetUrl');
   });

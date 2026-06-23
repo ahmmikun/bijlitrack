@@ -156,8 +156,10 @@ export const forgotPassword = async (req, res) => {
     const resetUrl = `${getFrontendUrl()}/reset-password?token=${resetToken}`;
     console.log(`[Auth] Password reset generated for ${user.email}`);
 
+    const emailSendingEnabled = process.env.NODE_ENV !== 'test';
     let mailSent = false;
-    if (isMailConfigured()) {
+
+    if (emailSendingEnabled && isMailConfigured()) {
       await sendPasswordResetEmail({
         to: user.email,
         name: user.name,
@@ -165,7 +167,7 @@ export const forgotPassword = async (req, res) => {
       });
       mailSent = true;
       console.log(`[Auth] Password reset email sent to ${user.email}`);
-    } else if (process.env.NODE_ENV === 'production') {
+    } else if (emailSendingEnabled && process.env.NODE_ENV === 'production') {
       console.error('[Auth] SMTP is not configured; password reset email cannot be sent in production');
       return res.status(500).json({ message: 'Password reset email service is not configured' });
     }
