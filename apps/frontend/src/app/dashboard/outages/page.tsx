@@ -15,6 +15,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
+const formatHour12 = (hour: number) => {
+  const normalizedHour = ((hour % 24) + 24) % 24;
+  const period = normalizedHour >= 12 ? 'PM' : 'AM';
+  const displayHour = normalizedHour % 12 || 12;
+
+  return `${displayHour} ${period}`;
+};
+
 export default function OutagesPage() {
   const searchParams = useSearchParams();
   const refId = searchParams.get('ref');
@@ -124,7 +132,7 @@ export default function OutagesPage() {
     const rows = outageHistory.map((o: any) => {
       const date = new Date(o.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       const totalMins = o.totalOutageMinutes || 0;
-      const hourly = (o.hourlyOutageMinutes || []).map((m: number, i: number) => m > 0 ? `${i}:00(${m}m)` : '').filter(Boolean).join(', ');
+      const hourly = (o.hourlyOutageMinutes || []).map((m: number, i: number) => m > 0 ? `${formatHour12(i)} (${m}m)` : '').filter(Boolean).join(', ');
       return `<tr>
         <td style="padding:8px;border:1px solid #ddd;">${date}</td>
         <td style="padding:8px;border:1px solid #ddd;text-align:center;">${formatDur(totalMins)}</td>
@@ -327,26 +335,23 @@ export default function OutagesPage() {
                 {hourlyMins.map((mins: number, i: number) => {
                   // Color based on outage minutes
                   let bgClass = 'bg-green-500/70'; // Fully ON
-                  let label = 'ON';
                   if (mins >= 60) {
                     bgClass = 'bg-red-500 shadow-sm shadow-red-500/30';
-                    label = '60m';
                   } else if (mins > 0) {
                     bgClass = 'bg-amber-500 shadow-sm shadow-amber-500/20';
-                    label = `${mins}m`;
                   }
                   
                   return (
                     <div key={i} className="flex flex-col items-center gap-0.5 group/hour relative">
                       <div 
                         className={`w-full aspect-[1/2] rounded-sm sm:rounded-md transition-all hover:scale-110 cursor-default ${bgClass}`}
-                        title={`${i.toString().padStart(2, '0')}:00 — ${mins === 0 ? 'No outage' : `${mins} min outage`}`}
+                        title={`${formatHour12(i)} - ${mins === 0 ? 'No outage' : `${mins} min outage`}`}
                       />
                       {mins > 0 && (
                         <span className="text-[6px] sm:text-[7px] font-black text-amber-500 leading-none">{mins}</span>
                       )}
                       {i % 6 === 0 && (
-                        <span className="text-[6px] sm:text-[7px] font-bold text-muted-foreground/60 leading-none">{i}</span>
+                        <span className="text-[6px] sm:text-[7px] font-bold text-muted-foreground/60 leading-none whitespace-nowrap">{formatHour12(i)}</span>
                       )}
                     </div>
                   );
