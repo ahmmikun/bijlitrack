@@ -111,6 +111,7 @@ PORT=5000
 MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/bijlitrack
 JWT_SECRET=your-secret-key-here
 FRONTEND_URL=http://localhost:3000
+ALLOWED_ORIGINS=http://localhost:3000,https://bijlitrack.up.railway.app
 
 # Password reset emails
 APP_NAME=BijliTrack

@@ -15,6 +15,8 @@ describe('Authentication API', () => {
   };
 
   beforeAll(async () => {
+    process.env.RETURN_PASSWORD_RESET_LINK = 'true';
+
     // If we have a real URI and it's not a local one, try to use it if requested
     // Otherwise, use memory server for safety and speed
     if (process.env.USE_REAL_DB === 'true' && process.env.MONGODB_URI) {
@@ -154,5 +156,15 @@ describe('Authentication API', () => {
 
     expect(res.status).toBe(400);
     expect(res.body.message).toMatch(/invalid or expired/i);
+  });
+
+  it('should allow CORS preflight from the Railway frontend', async () => {
+    const res = await request(app)
+      .options('/api/auth/forgot-password')
+      .set('Origin', 'https://bijlitrack.up.railway.app')
+      .set('Access-Control-Request-Method', 'POST');
+
+    expect(res.status).toBe(204);
+    expect(res.headers['access-control-allow-origin']).toBe('https://bijlitrack.up.railway.app');
   });
 });
