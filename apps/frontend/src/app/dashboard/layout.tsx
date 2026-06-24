@@ -227,9 +227,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {children}
         </main>
 
-        <footer className="border-t border-border px-6 sm:px-10 py-5 text-center bg-amber-500/5">
+        <footer className="border-t border-border px-6 sm:px-10 py-5 text-center bg-amber-500/5 space-y-2">
           <p className="text-[11px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-widest">
             ⚡ Coverage: PITC/CCMS supported public-sector DISCOs only. <span className="text-red-500">K-Electric may not be supported.</span>
+          </p>
+          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.2em]">
+            Made with ❤ by{' '}
+            <a href="https://www.github.com/ahmmikun" target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary transition-colors">
+              Salman Ahmad
+            </a>
           </p>
         </footer>
       </div>

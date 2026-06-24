@@ -112,6 +112,12 @@ export default function Home() {
             <span className="font-black text-foreground tracking-tighter uppercase">BijliTrack</span>
             <span className="text-muted-foreground/40 ml-2 text-xs font-bold">EST 2026</span>
           </div>
+          <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+            Made with ❤ by{' '}
+            <a href="https://www.github.com/ahmmikun" target="_blank" rel="noopener noreferrer" className="text-foreground hover:text-primary transition-colors">
+              Salman Ahmad
+            </a>
+          </p>
           <div className="flex flex-wrap justify-center gap-6 sm:gap-10 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
             <a href="#" className="hover:text-primary transition-colors">Help Center</a>
             <a href="#" className="hover:text-primary transition-colors">Privacy Policy</a>
