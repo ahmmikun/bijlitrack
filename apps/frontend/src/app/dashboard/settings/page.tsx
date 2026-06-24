@@ -30,6 +30,7 @@ export default function SettingsPage() {
     onSuccess: (_, deletedId) => {
       toast.success("Account removed");
       queryClient.invalidateQueries({ queryKey: ['my-references'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-references'] });
       if (activeRefId === deletedId) {
         setActiveRefId(null);
       }

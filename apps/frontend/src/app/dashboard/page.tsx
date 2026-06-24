@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 import api from '@/lib/api';
 import { fetchAllCCMSData, fetchFeederStatus } from '@/lib/ccms';
 import { useAuth } from '@/hooks/useAuth';
@@ -16,9 +17,10 @@ import { toast } from 'sonner';
 export default function DashboardOverview() {
   const { activeRefId, setActiveRefId } = useAuth();
   const queryClient = useQueryClient();
+  const [syncingRefId, setSyncingRefId] = useState<string | null>(null);
 
   const { data: references, isLoading, error, refetch } = useQuery({
-    queryKey: ['my-references'],
+    queryKey: ['dashboard-references'],
     queryFn: async () => {
       const res = await api.get('/reference/my');
       
@@ -57,7 +59,9 @@ export default function DashboardOverview() {
         }
       }));
       return detailedRefs;
-    }
+    },
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   // Live feeder status polling every 3 minutes for active reference
@@ -73,6 +77,7 @@ export default function DashboardOverview() {
 
   const handleSync = async (id: string, referenceNo: string) => {
     const toastId = toast.loading("Fetching latest data from CCMS...");
+    setSyncingRefId(id);
     try {
       // Fetch directly from CCMS (client-side, no geo-block)
       const ccmsData = await fetchAllCCMSData(referenceNo);
@@ -84,10 +89,32 @@ export default function DashboardOverview() {
         outageInfo: ccmsData.loadInfo
       });
 
+      queryClient.setQueryData(['dashboard-references'], (oldData: any) => {
+        if (!Array.isArray(oldData)) return oldData;
+
+        return oldData.map((ref: any) => {
+          if (ref._id !== id) return ref;
+
+          return {
+            ...ref,
+            details: {
+              consumerInfo: ccmsData.user,
+              billingInfo: ccmsData.bill,
+              outageInfo: ccmsData.loadInfo,
+              loadManagementInfo: ccmsData.loadInfo,
+              lastUpdated: new Date().toISOString(),
+            },
+          };
+        });
+      });
+
       toast.success("Account data updated", { id: toastId });
-      queryClient.invalidateQueries({ queryKey: ['my-references'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-references'] });
+      await queryClient.invalidateQueries({ queryKey: ['my-references'] });
     } catch (err: any) {
       toast.error(err.message || "Update failed", { id: toastId });
+    } finally {
+      setSyncingRefId(null);
     }
   };
 
@@ -177,6 +204,7 @@ export default function DashboardOverview() {
             const feeder = details.outageInfo;
             const consumer = details.consumerInfo;
             const isActive = activeRefId === ref._id;
+            const isSyncing = syncingRefId === ref._id;
             // Use live polled status if this is the active reference, otherwise use saved snapshot
             const currentFeederStatus = (isActive && liveStatus) ? liveStatus.currentStatus : feeder?.currentStatus;
             const isOnline = currentFeederStatus === 'ON';
@@ -287,11 +315,12 @@ export default function DashboardOverview() {
                   </Button>
                   <Button
                     onClick={() => handleSync(ref._id, ref.referenceNo)}
+                    disabled={isSyncing}
                     variant="outline"
                     className="h-12 font-semibold rounded-xl text-xs bg-card text-foreground border-border hover:bg-accent hover:text-foreground transition-all active:scale-95 group/sync"
                   >
-                    <RefreshCw className="mr-2 h-4 w-4 transition-transform group-active/sync:rotate-180" />
-                    Update
+                    <RefreshCw className={`mr-2 h-4 w-4 transition-transform ${isSyncing ? 'animate-spin' : 'group-active/sync:rotate-180'}`} />
+                    {isSyncing ? 'Updating' : 'Update'}
                   </Button>
                   <Link href={`/dashboard/details?ref=${ref._id}`} className="w-full">
                     <Button variant="ghost" className="w-full h-12 font-semibold rounded-xl text-xs text-primary hover:bg-primary/10 hover:text-primary transition-all active:scale-95 border border-primary/20">
