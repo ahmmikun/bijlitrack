@@ -269,6 +269,13 @@ export default function OutagesPage() {
         </AlertDescription>
       </Alert>
 
+      <Alert className="rounded-2xl border border-amber-500/30 bg-amber-500/10">
+        <Clock className="h-5 w-5 text-amber-500" />
+        <AlertDescription className="text-amber-700 dark:text-amber-300 text-xs font-bold ml-2 leading-relaxed">
+          Important: Log in regularly and use Sync Now to keep outage history updated. CCMS only returns recent outage data, so missed logins can leave gaps for some days.
+        </AlertDescription>
+      </Alert>
+
       {/* Stats Cards */}
       <div className="grid gap-6 sm:gap-8 lg:grid-cols-3">
         <Card className="border-border shadow-xl shadow-foreground/5 bg-card rounded-2xl sm:rounded-[2.5rem] p-6 sm:p-8 group hover:-translate-y-1 transition-all">

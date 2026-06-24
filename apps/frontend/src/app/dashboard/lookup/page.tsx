@@ -147,7 +147,7 @@ export default function LookupPage() {
                   <p className="text-muted-foreground font-bold text-sm uppercase tracking-wider">Enable daily outage tracking for this account?</p>
                   <p className="text-muted-foreground/70 text-xs font-medium mt-1">
                     <Info className="h-3 w-3 inline mr-1" />
-                    Daily tracking monitors <span className="font-bold text-foreground">power outages only</span>. Bills &amp; consumer info are fetched live when you view the dashboard.
+                    Daily tracking monitors <span className="font-bold text-foreground">power outages only</span>. Log in regularly to sync recent outage data, otherwise some days can be missed.
                   </p>
                </div>
             </div>
