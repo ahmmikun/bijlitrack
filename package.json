@@ -14,6 +14,9 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "overrides": {
+    "postcss": "^8.5.10"
+  },
   "dependencies": {
     "mongodb": "^7.3.0"
   }
