@@ -89,6 +89,7 @@ export default function DashboardOverview() {
         outageInfo: ccmsData.loadInfo
       });
 
+      // Immediately update local UI with fresh data (no re-fetching from backend)
       queryClient.setQueryData(['dashboard-references'], (oldData: any) => {
         if (!Array.isArray(oldData)) return oldData;
 
@@ -108,9 +109,24 @@ export default function DashboardOverview() {
         });
       });
 
+      // Also update the details page cache if user navigates there
+      queryClient.setQueryData(['reference-details', id], {
+        consumerInfo: ccmsData.user,
+        billingInfo: ccmsData.bill,
+        feederInfo: ccmsData.loadInfo ? {
+          code: ccmsData.loadInfo.feederCode,
+          name: ccmsData.loadInfo.feederName,
+          grid: ccmsData.loadInfo.gridStation,
+        } : null,
+        loadManagementInfo: ccmsData.loadInfo,
+        outageInfo: ccmsData.loadInfo,
+        lastUpdated: new Date().toISOString(),
+      });
+
+      // Force refresh live feeder status
+      queryClient.invalidateQueries({ queryKey: ['live-feeder-status', referenceNo] });
+
       toast.success("Account data updated", { id: toastId });
-      await queryClient.invalidateQueries({ queryKey: ['dashboard-references'] });
-      await queryClient.invalidateQueries({ queryKey: ['my-references'] });
     } catch (err: any) {
       toast.error(err.message || "Update failed", { id: toastId });
     } finally {

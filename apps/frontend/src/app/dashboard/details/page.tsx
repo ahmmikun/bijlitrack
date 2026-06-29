@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 export default function ReferenceDetailsPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const refId = searchParams.get('ref');
   const { setActiveRefId } = useAuth();
 
@@ -56,8 +57,25 @@ export default function ReferenceDetailsPage() {
         billingInfo: ccmsData.bill,
         outageInfo: ccmsData.loadInfo
       });
+
+      // Immediately update local cache with fresh CCMS data (no waiting for backend round-trip)
+      queryClient.setQueryData(['reference-details', refId], {
+        consumerInfo: ccmsData.user,
+        billingInfo: ccmsData.bill,
+        feederInfo: ccmsData.loadInfo ? {
+          code: ccmsData.loadInfo.feederCode,
+          name: ccmsData.loadInfo.feederName,
+          grid: ccmsData.loadInfo.gridStation,
+        } : null,
+        loadManagementInfo: ccmsData.loadInfo,
+        outageInfo: ccmsData.loadInfo,
+        lastUpdated: new Date().toISOString(),
+      });
+
+      // Also force refresh live load info
+      queryClient.invalidateQueries({ queryKey: ['live-load-details', ref.referenceNo] });
+
       toast.success("Account data updated", { id: toastId });
-      refetch();
     } catch (err: any) {
       toast.error(err.message || "Failed to update data", { id: toastId });
     }
@@ -70,7 +88,7 @@ export default function ReferenceDetailsPage() {
     queryFn: () => fetchLoadInfo(currentRefNo!),
     enabled: !!currentRefNo,
     refetchInterval: 5 * 60 * 1000,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 0, // Always refetch when invalidated
   });
 
   if (isLoading) {
