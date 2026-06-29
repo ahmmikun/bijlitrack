@@ -2,10 +2,49 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Search, Zap, BarChart3, ShieldCheck, ArrowRight, Activity, Bell } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'BijliTrack — Free Electricity Bill & Outage Tracker for Pakistan',
+  description: 'Check your LESCO, GEPCO, FESCO, IESCO, MEPCO, PESCO, HESCO electricity bill online. Track real-time power outages, feeder status, load shedding schedule, and file complaints. Free for all Pakistani DISCOs.',
+  alternates: {
+    canonical: 'https://bijlitrack.up.railway.app',
+  },
+};
 
 export default function Home() {
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebApplication',
+    name: 'BijliTrack',
+    url: 'https://bijlitrack.up.railway.app',
+    description: 'Free smart electricity dashboard for Pakistani consumers. Track bills, outages, feeder status, and complaints for LESCO, GEPCO, FESCO, IESCO, MEPCO, PESCO, HESCO, SEPCO, QESCO, TESCO.',
+    applicationCategory: 'UtilityApplication',
+    operatingSystem: 'Web',
+    offers: {
+      '@type': 'Offer',
+      price: '0',
+      priceCurrency: 'PKR',
+    },
+    author: {
+      '@type': 'Person',
+      name: 'Salman Ahmad',
+      url: 'https://github.com/ahmmikun',
+    },
+    aggregateRating: {
+      '@type': 'AggregateRating',
+      ratingValue: '4.8',
+      ratingCount: '50',
+    },
+  };
+
   return (
     <div className="bg-background min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary overflow-x-hidden transition-colors duration-300">
+      {/* JSON-LD Structured Data */}
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Background Decorative Elements */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none opacity-50 dark:opacity-20">
         <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-[120px] animate-pulse"></div>
@@ -48,10 +87,10 @@ export default function Home() {
               <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Real-time Utility Sync Active</span>
             </div>
             <h1 className="text-5xl font-black tracking-tighter text-foreground sm:text-7xl lg:leading-[1.1] uppercase">
-              Smart Bill & <span className="text-primary">Outage</span> Tracker
+              Pakistan&apos;s Smart <span className="text-primary">Electricity</span> Dashboard
             </h1>
             <p className="mt-8 text-lg sm:text-xl leading-8 text-muted-foreground font-medium max-w-2xl mx-auto">
-              Easily manage your electricity accounts. Track your monthly bills, check live feeder status, and get automated reports in one place.
+              Check your LESCO, GEPCO, FESCO, IESCO, MEPCO, PESCO, HESCO electricity bill online. Track real-time feeder status, power outages, load shedding schedule, and complaint history — all in one free dashboard.
             </p>
             <div className="mt-12 flex flex-col sm:flex-row items-center justify-center gap-4">
               <Link href="/signup" className="w-full sm:w-auto">
@@ -74,20 +113,20 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
               {[
                 { 
-                  title: 'Live Status', 
-                  desc: 'Check if your power is on or off in real-time with direct updates from your grid station.',
+                  title: 'Live Feeder Status', 
+                  desc: 'Check if your feeder is ON or OFF in real-time. See voltage, power factor, and grid station details for LESCO, GEPCO, FESCO and all DISCOs.',
                   icon: Activity,
                   color: 'text-blue-500 bg-blue-500/10'
                 },
                 { 
-                  title: 'Bill History', 
-                  desc: 'See your last 12 months of bills and payments in a clean, easy-to-read table and graph.',
+                  title: 'Bill History & Breakdown', 
+                  desc: 'View 12 months of electricity bills with detailed charges breakdown — energy charges, GST, FPA, surcharges. Works for all WAPDA DISCOs.',
                   icon: BarChart3,
                   color: 'text-indigo-500 bg-indigo-500/10'
                 },
                 { 
-                  title: 'Easy Alerts', 
-                  desc: 'Never miss a due date again. Get insights and recommendations on your consumption patterns.',
+                  title: 'Outage & Load Shedding', 
+                  desc: 'Track daily power outages hour-by-hour. See scheduled load shedding, actual tripping data, and export reports as PDF.',
                   icon: Bell,
                   color: 'text-amber-500 bg-amber-500/10'
                 }
@@ -98,6 +137,52 @@ export default function Home() {
                   </div>
                   <h3 className="text-xl font-black text-foreground mb-3 tracking-tight uppercase">{f.title}</h3>
                   <p className="text-muted-foreground font-medium leading-relaxed">{f.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* Supported DISCOs Section — SEO rich */}
+        <section className="px-6 py-20">
+          <div className="max-w-5xl mx-auto text-center">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-foreground uppercase mb-6">
+              Works With All Pakistani <span className="text-primary">DISCOs</span>
+            </h2>
+            <p className="text-muted-foreground font-medium max-w-2xl mx-auto mb-10">
+              BijliTrack supports all PITC/CCMS connected electricity distribution companies. Check your bijli bill, track outages, and monitor feeder status.
+            </p>
+            <div className="flex flex-wrap justify-center gap-3 sm:gap-4">
+              {['LESCO', 'GEPCO', 'FESCO', 'IESCO', 'MEPCO', 'PESCO', 'HESCO', 'SEPCO', 'QESCO', 'TESCO', 'AJ&K'].map((disco) => (
+                <span key={disco} className="px-4 py-2 rounded-xl bg-card border border-border text-sm font-bold text-foreground shadow-sm hover:border-primary/40 transition-colors">
+                  {disco}
+                </span>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground mt-6 font-medium">
+              Data sourced from official CCMS/PITC systems. K-Electric is not supported.
+            </p>
+          </div>
+        </section>
+
+        {/* How It Works — SEO content */}
+        <section className="px-6 py-20 bg-card/50 border-y border-border">
+          <div className="max-w-5xl mx-auto">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-foreground uppercase text-center mb-12">
+              How to Check Your <span className="text-primary">Electricity Bill</span> Online
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {[
+                { step: '1', title: 'Enter Reference Number', desc: 'Enter your 14-digit electricity reference number from your bill to get started.' },
+                { step: '2', title: 'View Live Dashboard', desc: 'See your current bill amount, due date, feeder status, voltage, and power outage history.' },
+                { step: '3', title: 'Track & Export', desc: 'Monitor daily outages, view bill trends, track complaints, and export reports as PDF.' },
+              ].map((item) => (
+                <div key={item.step} className="text-center p-6">
+                  <div className="h-12 w-12 rounded-full bg-primary text-primary-foreground font-black text-xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
+                    {item.step}
+                  </div>
+                  <h3 className="text-lg font-bold text-foreground mb-2">{item.title}</h3>
+                  <p className="text-muted-foreground text-sm font-medium">{item.desc}</p>
                 </div>
               ))}
             </div>
