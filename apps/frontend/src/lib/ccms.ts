@@ -224,66 +224,43 @@ export const fetchAllCCMSData = async (referenceNo: string) => {
  * Falls back to backend if client-side fails (CORS).
  */
 export const fetchExpectedRestorationTime = async (referenceNo: string, refId?: string) => {
-  // Try client-side first (only works from Pakistani IP without CORS issues)
+  // Client-side only — uses browser's XSRF-TOKEN cookie from CCMS
   try {
-    // Step 1: Fetch the main page to get CSRF token from a meta tag or form
-    const pageRes = await fetch(`${CCMS_BASE}/consumer/${referenceNo}`, {
+    // Get XSRF-TOKEN from cookie (set by CCMS when user visits any CCMS page/API)
+    const cookieMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+    if (!cookieMatch) {
+      // No XSRF cookie yet — hit CCMS homepage to set it
+      await fetch(`${CCMS_BASE}/`, { credentials: 'include' });
+    }
+
+    const xsrfToken = decodeURIComponent(
+      document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] || ''
+    );
+
+    if (!xsrfToken) {
+      console.warn('[CCMS] No XSRF-TOKEN cookie available');
+      return null;
+    }
+
+    // POST to getflsinfo with X-XSRF-TOKEN header + session cookie
+    const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-XSRF-TOKEN': xsrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Accept': 'text/html, */*',
+      },
       credentials: 'include',
+      body: `reference=${referenceNo}`,
     });
-    const pageHtml = await pageRes.text();
 
-    // Extract CSRF token — Laravel stores it in <meta name="csrf-token" content="...">
-    // or in <input type="hidden" name="_token" value="...">
-    let csrfToken: string | null = null;
-    const metaMatch = pageHtml.match(/name="csrf-token"\s+content="([^"]+)"/);
-    if (metaMatch) {
-      csrfToken = metaMatch[1];
-    }
-    if (!csrfToken) {
-      const inputMatch = pageHtml.match(/name="_token"\s+value="([^"]+)"/);
-      if (inputMatch) csrfToken = inputMatch[1];
-    }
-    if (!csrfToken) {
-      const tokenMatch = pageHtml.match(/_token['"]\s*(?:value|content)\s*=\s*['"]([^'"]+)/);
-      if (tokenMatch) csrfToken = tokenMatch[1];
-    }
-
-    if (csrfToken) {
-      // Step 2: POST to getflsinfo with _token + reference
-      const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Accept': 'text/html, */*',
-        },
-        credentials: 'include',
-        body: `_token=${encodeURIComponent(csrfToken)}&reference=${referenceNo}`,
-      });
-
-      const html = await res.text();
-      if (html && html.length > 100 && (html.includes('glaxy_status') || html.includes('Expected Restoration') || html.includes('Feeder Status'))) {
-        return parseRestorationHTML(html);
-      }
+    const html = await res.text();
+    if (html && html.length > 500 && html.includes('glaxy_status')) {
+      return parseRestorationHTML(html);
     }
   } catch (err) {
-    console.warn('[CCMS] Client-side restoration fetch failed:', err);
-  }
-
-  // Fallback: call backend endpoint which does server-side scraping
-  if (refId) {
-    try {
-      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-      const res = await fetch(
-        `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')}/dashboard/${refId}/restoration`,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Backend also failed
-    }
+    console.warn('[CCMS] Failed to fetch restoration time:', err);
   }
 
   return null;
