@@ -95,7 +95,7 @@ export default function ReferenceDetailsPage() {
   // Live restoration time from HTML scraping (only when feeder is OFF)
   const { data: restorationData } = useQuery({
     queryKey: ['live-restoration-time', currentRefNo],
-    queryFn: () => fetchExpectedRestorationTime(currentRefNo!),
+    queryFn: () => fetchExpectedRestorationTime(currentRefNo!, refId || undefined),
     enabled: !!currentRefNo,
     refetchInterval: 3 * 60 * 1000, // Check every 3 min when feeder is off
     staleTime: 0,

@@ -216,60 +216,84 @@ export const fetchAllCCMSData = async (referenceNo: string) => {
  * This data is ONLY available in the rendered HTML, not in the JSON API.
  * The HTML contains: <span><b>Expected Restoration Time: </b>03:15 AM</span>
  * This only appears when the feeder is OFF.
+ * 
+ * Strategy: Try client-side first (direct CCMS fetch), fallback to backend scraping.
  */
-export const fetchExpectedRestorationTime = async (referenceNo: string) => {
+export const fetchExpectedRestorationTime = async (referenceNo: string, refId?: string) => {
+  // First try client-side (works if CORS allows it from Pakistani IP)
   try {
-    // getflsinfo is a POST endpoint that returns the load management HTML
-    const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-      },
-      body: `reference=${referenceNo}`,
-    });
+    const bodyFormats = [
+      `ref_no=${referenceNo}`,
+      `reference=${referenceNo}`,
+    ];
 
-    const html = await res.text();
-    if (!html || html.length < 50) return null;
+    for (const body of bodyFormats) {
+      try {
+        const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+            'Accept': 'text/html, */*',
+          },
+          body,
+        });
+        const text = await res.text();
+        if (text && text.length > 100 && (text.includes('LoadManagement') || text.includes('Feeder Status') || text.includes('Expected Restoration') || text.includes('glaxy_status'))) {
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(text, 'text/html');
 
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
+          let expectedRestorationTime: string | null = null;
+          const bolds = doc.querySelectorAll('b');
+          for (const bold of bolds) {
+            if (bold.textContent?.includes('Expected Restoration Time')) {
+              const parentSpan = bold.parentElement;
+              if (parentSpan) {
+                const fullText = parentSpan.textContent || '';
+                const timeMatch = fullText.replace('Expected Restoration Time:', '').trim();
+                if (timeMatch) expectedRestorationTime = timeMatch;
+              }
+              break;
+            }
+          }
 
-    // Extract Expected Restoration Time from the HTML
-    // Pattern: <span><b>Expected Restoration Time: </b>03:15 AM</span>
-    let expectedRestorationTime: string | null = null;
-    const spans = doc.querySelectorAll('span');
-    for (const span of spans) {
-      const bold = span.querySelector('b');
-      if (bold && bold.textContent?.includes('Expected Restoration Time')) {
-        // The time is the text after the <b> tag within the same <span>
-        const fullText = span.textContent || '';
-        const timeMatch = fullText.replace('Expected Restoration Time:', '').trim();
-        if (timeMatch) {
-          expectedRestorationTime = timeMatch;
+          // Regex fallback
+          if (!expectedRestorationTime) {
+            const match = text.match(/Expected Restoration Time:\s*<\/b>\s*([^<]+)/i);
+            if (match?.[1]) expectedRestorationTime = match[1].trim();
+          }
+
+          const plannedOutage = doc.getElementById('total_off')?.textContent?.trim() || null;
+          const actualOutage = doc.getElementById('live_off')?.textContent?.trim() || null;
+          const historyOutage = doc.getElementById('act_off')?.textContent?.trim() || null;
+
+          return { expectedRestorationTime, plannedOutage, actualOutage, historyOutage };
         }
-        break;
+      } catch {
+        continue;
       }
     }
-
-    // Extract outage summary badges
-    // <span id="total_off" class="label label-danger trp" title="Planned">2 Hour(s)</span>
-    // <span id="live_off" class="label label-info trp" title="Actual">00h 04m</span>
-    // <span id="act_off" class="label label-warning trp" title="History">07h 15m</span>
-    const plannedOutage = doc.getElementById('total_off')?.textContent?.trim() || null;
-    const actualOutage = doc.getElementById('live_off')?.textContent?.trim() || null;
-    const historyOutage = doc.getElementById('act_off')?.textContent?.trim() || null;
-
-    return {
-      expectedRestorationTime,
-      plannedOutage,
-      actualOutage,
-      historyOutage,
-    };
-  } catch (err) {
-    console.warn('[CCMS] Failed to fetch restoration time:', err);
-    return null;
+  } catch {
+    // Client-side failed, will try backend
   }
+
+  // Fallback: call backend endpoint which does server-side scraping
+  if (refId) {
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+      const res = await fetch(
+        `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '')}/dashboard/${refId}/restoration`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch {
+      // Backend also failed
+    }
+  }
+
+  return null;
 };
 
 /**
