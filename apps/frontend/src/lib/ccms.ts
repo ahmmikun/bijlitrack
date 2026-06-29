@@ -217,64 +217,57 @@ export const fetchAllCCMSData = async (referenceNo: string) => {
  * The HTML contains: <span><b>Expected Restoration Time: </b>03:15 AM</span>
  * This only appears when the feeder is OFF.
  * 
- * Strategy: Try client-side first (direct CCMS fetch), fallback to backend scraping.
+ * Strategy: 
+ * 1. First fetch the CCMS consumer page to get the CSRF _token
+ * 2. Then POST to /getflsinfo with _token + reference
+ * 3. Parse HTML response for restoration time
+ * Falls back to backend if client-side fails (CORS).
  */
 export const fetchExpectedRestorationTime = async (referenceNo: string, refId?: string) => {
-  // First try client-side (works if CORS allows it from Pakistani IP)
+  // Try client-side first (only works from Pakistani IP without CORS issues)
   try {
-    const bodyFormats = [
-      `ref_no=${referenceNo}`,
-      `reference=${referenceNo}`,
-    ];
+    // Step 1: Fetch the main page to get CSRF token from a meta tag or form
+    const pageRes = await fetch(`${CCMS_BASE}/consumer/${referenceNo}`, {
+      credentials: 'include',
+    });
+    const pageHtml = await pageRes.text();
 
-    for (const body of bodyFormats) {
-      try {
-        const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'X-Requested-With': 'XMLHttpRequest',
-            'Accept': 'text/html, */*',
-          },
-          body,
-        });
-        const text = await res.text();
-        if (text && text.length > 100 && (text.includes('LoadManagement') || text.includes('Feeder Status') || text.includes('Expected Restoration') || text.includes('glaxy_status'))) {
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(text, 'text/html');
+    // Extract CSRF token — Laravel stores it in <meta name="csrf-token" content="...">
+    // or in <input type="hidden" name="_token" value="...">
+    let csrfToken: string | null = null;
+    const metaMatch = pageHtml.match(/name="csrf-token"\s+content="([^"]+)"/);
+    if (metaMatch) {
+      csrfToken = metaMatch[1];
+    }
+    if (!csrfToken) {
+      const inputMatch = pageHtml.match(/name="_token"\s+value="([^"]+)"/);
+      if (inputMatch) csrfToken = inputMatch[1];
+    }
+    if (!csrfToken) {
+      const tokenMatch = pageHtml.match(/_token['"]\s*(?:value|content)\s*=\s*['"]([^'"]+)/);
+      if (tokenMatch) csrfToken = tokenMatch[1];
+    }
 
-          let expectedRestorationTime: string | null = null;
-          const bolds = doc.querySelectorAll('b');
-          for (const bold of bolds) {
-            if (bold.textContent?.includes('Expected Restoration Time')) {
-              const parentSpan = bold.parentElement;
-              if (parentSpan) {
-                const fullText = parentSpan.textContent || '';
-                const timeMatch = fullText.replace('Expected Restoration Time:', '').trim();
-                if (timeMatch) expectedRestorationTime = timeMatch;
-              }
-              break;
-            }
-          }
+    if (csrfToken) {
+      // Step 2: POST to getflsinfo with _token + reference
+      const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html, */*',
+        },
+        credentials: 'include',
+        body: `_token=${encodeURIComponent(csrfToken)}&reference=${referenceNo}`,
+      });
 
-          // Regex fallback
-          if (!expectedRestorationTime) {
-            const match = text.match(/Expected Restoration Time:\s*<\/b>\s*([^<]+)/i);
-            if (match?.[1]) expectedRestorationTime = match[1].trim();
-          }
-
-          const plannedOutage = doc.getElementById('total_off')?.textContent?.trim() || null;
-          const actualOutage = doc.getElementById('live_off')?.textContent?.trim() || null;
-          const historyOutage = doc.getElementById('act_off')?.textContent?.trim() || null;
-
-          return { expectedRestorationTime, plannedOutage, actualOutage, historyOutage };
-        }
-      } catch {
-        continue;
+      const html = await res.text();
+      if (html && html.length > 100 && (html.includes('glaxy_status') || html.includes('Expected Restoration') || html.includes('Feeder Status'))) {
+        return parseRestorationHTML(html);
       }
     }
-  } catch {
-    // Client-side failed, will try backend
+  } catch (err) {
+    console.warn('[CCMS] Client-side restoration fetch failed:', err);
   }
 
   // Fallback: call backend endpoint which does server-side scraping
@@ -294,6 +287,44 @@ export const fetchExpectedRestorationTime = async (referenceNo: string, refId?: 
   }
 
   return null;
+};
+
+/**
+ * Parse the getflsinfo HTML response to extract restoration time and outage stats
+ */
+const parseRestorationHTML = (html: string) => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  // Extract Expected Restoration Time
+  // Pattern: <span><b>Expected Restoration Time: </b>03:15 AM</span>
+  let expectedRestorationTime: string | null = null;
+
+  const bolds = doc.querySelectorAll('b');
+  for (const bold of bolds) {
+    if (bold.textContent?.includes('Expected Restoration Time')) {
+      const parent = bold.parentElement;
+      if (parent) {
+        const fullText = parent.textContent || '';
+        const time = fullText.replace('Expected Restoration Time:', '').trim();
+        if (time) expectedRestorationTime = time;
+      }
+      break;
+    }
+  }
+
+  // Regex fallback
+  if (!expectedRestorationTime) {
+    const match = html.match(/Expected Restoration Time:\s*<\/b>\s*([^<]+)/i);
+    if (match?.[1]) expectedRestorationTime = match[1].trim();
+  }
+
+  // Extract outage summary badges
+  const plannedOutage = doc.getElementById('total_off')?.textContent?.trim() || null;
+  const actualOutage = doc.getElementById('live_off')?.textContent?.trim() || null;
+  const historyOutage = doc.getElementById('act_off')?.textContent?.trim() || null;
+
+  return { expectedRestorationTime, plannedOutage, actualOutage, historyOutage };
 };
 
 /**

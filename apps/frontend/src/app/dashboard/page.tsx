@@ -267,6 +267,11 @@ export default function DashboardOverview() {
                         {currentFeederStatus || 'OFF'}
                       </Badge>
                       <span className="text-xs text-muted-foreground/60">Power Status</span>
+                      {!isOnline && feeder?.expectedRestorationTime && (
+                        <span className="text-[9px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 mt-1">
+                          ERT: {feeder.expectedRestorationTime}
+                        </span>
+                      )}
                     </div>
                   </div>
 
