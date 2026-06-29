@@ -57,13 +57,18 @@ const parseLoadInfo = (feederData: any, feederMeta?: any) => {
 
   // Add today's tripping data as today's record (real-time outage for current day)
   if (feederData.tripping && Array.isArray(feederData.tripping)) {
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    // Use local date (Pakistan Standard Time, UTC+5) not UTC
+    const now = new Date();
+    const pkOffset = 5 * 60; // PKT is UTC+5
+    const localTime = new Date(now.getTime() + (pkOffset + now.getTimezoneOffset()) * 60000);
+    const today = `${localTime.getFullYear()}-${String(localTime.getMonth() + 1).padStart(2, '0')}-${String(localTime.getDate()).padStart(2, '0')}`;
+    
     const hourlyMinutes = feederData.tripping as number[];
     const totalOutageMinutes = hourlyMinutes.reduce((sum: number, v: number) => sum + v, 0);
 
-    // Override today's record with tripping if tripping has outage data
-    // (tripping is more real-time than history_data for today)
-    if (totalOutageMinutes > 0 || !result.days[today]) {
+    // Only set tripping as today's record if today doesn't already have history_data
+    // OR if tripping has more recent/complete data for today
+    if (!result.days[today]) {
       result.days[today] = {
         date: today,
         hourlyOutageMinutes: hourlyMinutes,
@@ -75,6 +80,23 @@ const parseLoadInfo = (feederData: any, feederMeta?: any) => {
           return 'PARTIAL';
         }),
       };
+    } else if (totalOutageMinutes > 0) {
+      // Today exists from history_data — merge: use tripping if it has more data
+      // (tripping is real-time and may have newer hours filled in)
+      const existingTotal = result.days[today].totalOutageMinutes || 0;
+      if (totalOutageMinutes >= existingTotal) {
+        result.days[today] = {
+          ...result.days[today],
+          hourlyOutageMinutes: hourlyMinutes,
+          totalOutageMinutes,
+          totalOutageHours: parseFloat((totalOutageMinutes / 60).toFixed(2)),
+          hourlyStatus: hourlyMinutes.map((mins: number) => {
+            if (mins === 0) return 'ON';
+            if (mins >= 60) return 'OFF';
+            return 'PARTIAL';
+          }),
+        };
+      }
     }
   }
 
