@@ -47,13 +47,16 @@ const safeFetchJson = async (url) => {
  * @param {Object} feederData - The data[0] object from get-loadinfo API
  * @returns {Object} Parsed outage data for all available days
  */
-export const parseLoadInfo = (feederData) => {
+export const parseLoadInfo = (feederData, feederMeta) => {
   const result = {
     feederCode: feederData.feeder_code || null,
     feederName: feederData.feeder || null,
     gridStation: feederData.grid || null,
     currentStatus: feederData.current_status || null,
     currentStatusTime: feederData.current_status_time || null,
+    expectedRestorationTime: feederMeta?.time || feederData.expected_restoration_time || null,
+    expectedRestorationDate: feederMeta?.date || null,
+    expectedRestorationDuration: feederMeta?.duration || null,
     voltage: feederData.voltage || 0,
     current: feederData.current || 0,
     activePower: feederData.active_power_kW || 0,
@@ -154,7 +157,7 @@ export const fetchLoadInfo = async (referenceNo) => {
     }
 
     const feederData = json.load[0].response.data[0];
-    result.data = parseLoadInfo(feederData);
+    result.data = parseLoadInfo(feederData, json.feeder || null);
     result.success = true;
 
     console.log(`[CCMS] Load info parsed for ${referenceNo} - Status: ${result.data.currentStatus}, Days: ${Object.keys(result.data.days).length}, Events: ${result.data.eventLogs.length}`);
@@ -215,7 +218,7 @@ export const fetchAllDetails = async (referenceNo) => {
 
     if (loadJson.message === 'Success' && loadJson.load?.[0]?.response?.data?.[0]) {
       const feederData = loadJson.load[0].response.data[0];
-      result.loadInfo = parseLoadInfo(feederData);
+      result.loadInfo = parseLoadInfo(feederData, loadJson.feeder || null);
       result.schedule = result.loadInfo; // Backward compat
     }
 

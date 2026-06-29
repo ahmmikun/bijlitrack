@@ -9,13 +9,16 @@ const CCMS_BASE = 'https://ccms.pitc.com.pk';
 /**
  * Parse load info data from get-loadinfo API
  */
-const parseLoadInfo = (feederData: any) => {
+const parseLoadInfo = (feederData: any, feederMeta?: any) => {
   const result: any = {
     feederCode: feederData.feeder_code || null,
     feederName: feederData.feeder || null,
     gridStation: feederData.grid || null,
     currentStatus: feederData.current_status || null,
     currentStatusTime: feederData.current_status_time || null,
+    expectedRestorationTime: feederMeta?.time || feederData.expected_restoration_time || null,
+    expectedRestorationDate: feederMeta?.date || null,
+    expectedRestorationDuration: feederMeta?.duration || null,
     voltage: feederData.voltage || 0,
     current: feederData.current || 0,
     activePower: feederData.active_power_kW || 0,
@@ -129,9 +132,13 @@ export const fetchFeederStatus = async (referenceNo: string) => {
     throw new Error('Status unavailable');
   }
   const d = data.load[0].response.data[0];
+  const feederMeta = data.feeder || null;
   return {
     currentStatus: d.current_status || 'OFF',
     currentStatusTime: d.current_status_time || null,
+    expectedRestorationTime: feederMeta?.time || d.expected_restoration_time || null,
+    expectedRestorationDate: feederMeta?.date || null,
+    expectedRestorationDuration: feederMeta?.duration || null,
     voltage: d.voltage || 0,
     powerFactor: d.power_factor || 0,
     activePower: d.active_power_kW || 0,
@@ -157,7 +164,7 @@ export const fetchLoadInfo = async (referenceNo: string) => {
   if (data.message !== 'Success' || !data.load?.[0]?.response?.data?.[0]) {
     throw new Error('Load info not available');
   }
-  return parseLoadInfo(data.load[0].response.data[0]);
+  return parseLoadInfo(data.load[0].response.data[0], data.feeder || null);
 };
 
 /**

@@ -271,6 +271,19 @@ export default function ReferenceDetailsPage() {
                 <div className={`h-3 w-3 rounded-full ${isOnline ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-red-500 animate-ping'} shrink-0`}></div>
                 <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{currentStatus || 'OFFLINE'}</p>
               </div>
+              {/* Expected Restoration Time - only visible when feeder is OFF */}
+              {!isOnline && (liveLoadInfo?.expectedRestorationTime || feeder.expectedRestorationTime) && (
+                <div className="mt-3 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                  <p className="text-[9px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-widest text-center">
+                    Expected Restoration: <span className="text-amber-700 dark:text-amber-300 font-black">
+                      {liveLoadInfo?.expectedRestorationDate && `${liveLoadInfo.expectedRestorationDate} `}
+                      {liveLoadInfo?.expectedRestorationTime || feeder.expectedRestorationTime}
+                      {(liveLoadInfo?.expectedRestorationDuration || feeder.expectedRestorationDuration) && 
+                        ` (${liveLoadInfo?.expectedRestorationDuration || feeder.expectedRestorationDuration})`}
+                    </span>
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
