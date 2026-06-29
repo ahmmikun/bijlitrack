@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
-import { fetchAllCCMSData, fetchLoadInfo } from '@/lib/ccms';
+import { fetchAllCCMSData, fetchLoadInfo, fetchExpectedRestorationTime } from '@/lib/ccms';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,6 +74,7 @@ export default function ReferenceDetailsPage() {
 
       // Also force refresh live load info
       queryClient.invalidateQueries({ queryKey: ['live-load-details', ref.referenceNo] });
+      queryClient.invalidateQueries({ queryKey: ['live-restoration-time', ref.referenceNo] });
 
       toast.success("Account data updated", { id: toastId });
     } catch (err: any) {
@@ -89,6 +90,15 @@ export default function ReferenceDetailsPage() {
     enabled: !!currentRefNo,
     refetchInterval: 5 * 60 * 1000,
     staleTime: 0, // Always refetch when invalidated
+  });
+
+  // Live restoration time from HTML scraping (only when feeder is OFF)
+  const { data: restorationData } = useQuery({
+    queryKey: ['live-restoration-time', currentRefNo],
+    queryFn: () => fetchExpectedRestorationTime(currentRefNo!),
+    enabled: !!currentRefNo,
+    refetchInterval: 3 * 60 * 1000, // Check every 3 min when feeder is off
+    staleTime: 0,
   });
 
   if (isLoading) {
@@ -290,16 +300,33 @@ export default function ReferenceDetailsPage() {
                 <p className={`text-2xl font-bold tracking-tight uppercase ${isOnline ? 'text-green-500' : 'text-red-500'}`}>{currentStatus || 'OFFLINE'}</p>
               </div>
               {/* Expected Restoration Time - only visible when feeder is OFF */}
-              {!isOnline && (liveLoadInfo?.expectedRestorationTime || feeder.expectedRestorationTime) && (
+              {!isOnline && (restorationData?.expectedRestorationTime || liveLoadInfo?.expectedRestorationTime || feeder.expectedRestorationTime) && (
                 <div className="mt-3 px-3 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
                   <p className="text-[9px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-widest text-center">
                     Expected Restoration: <span className="text-amber-700 dark:text-amber-300 font-black">
-                      {liveLoadInfo?.expectedRestorationDate && `${liveLoadInfo.expectedRestorationDate} `}
-                      {liveLoadInfo?.expectedRestorationTime || feeder.expectedRestorationTime}
-                      {(liveLoadInfo?.expectedRestorationDuration || feeder.expectedRestorationDuration) && 
-                        ` (${liveLoadInfo?.expectedRestorationDuration || feeder.expectedRestorationDuration})`}
+                      {restorationData?.expectedRestorationTime || liveLoadInfo?.expectedRestorationTime || feeder.expectedRestorationTime}
                     </span>
                   </p>
+                </div>
+              )}
+              {/* Live outage summary from HTML scraping */}
+              {!isOnline && restorationData && (restorationData.actualOutage || restorationData.historyOutage) && (
+                <div className="mt-2 flex items-center justify-center gap-3 flex-wrap">
+                  {restorationData.plannedOutage && (
+                    <span className="text-[8px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+                      Planned: {restorationData.plannedOutage}
+                    </span>
+                  )}
+                  {restorationData.actualOutage && (
+                    <span className="text-[8px] font-bold text-blue-500 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                      Today: {restorationData.actualOutage}
+                    </span>
+                  )}
+                  {restorationData.historyOutage && (
+                    <span className="text-[8px] font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      History: {restorationData.historyOutage}
+                    </span>
+                  )}
                 </div>
               )}
             </div>

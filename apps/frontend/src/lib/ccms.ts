@@ -212,6 +212,67 @@ export const fetchAllCCMSData = async (referenceNo: string) => {
 };
 
 /**
+ * Fetch Expected Restoration Time by scraping the CCMS load management HTML page.
+ * This data is ONLY available in the rendered HTML, not in the JSON API.
+ * The HTML contains: <span><b>Expected Restoration Time: </b>03:15 AM</span>
+ * This only appears when the feeder is OFF.
+ */
+export const fetchExpectedRestorationTime = async (referenceNo: string) => {
+  try {
+    // getflsinfo is a POST endpoint that returns the load management HTML
+    const res = await fetch(`${CCMS_BASE}/getflsinfo`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'X-Requested-With': 'XMLHttpRequest',
+      },
+      body: `reference=${referenceNo}`,
+    });
+
+    const html = await res.text();
+    if (!html || html.length < 50) return null;
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Extract Expected Restoration Time from the HTML
+    // Pattern: <span><b>Expected Restoration Time: </b>03:15 AM</span>
+    let expectedRestorationTime: string | null = null;
+    const spans = doc.querySelectorAll('span');
+    for (const span of spans) {
+      const bold = span.querySelector('b');
+      if (bold && bold.textContent?.includes('Expected Restoration Time')) {
+        // The time is the text after the <b> tag within the same <span>
+        const fullText = span.textContent || '';
+        const timeMatch = fullText.replace('Expected Restoration Time:', '').trim();
+        if (timeMatch) {
+          expectedRestorationTime = timeMatch;
+        }
+        break;
+      }
+    }
+
+    // Extract outage summary badges
+    // <span id="total_off" class="label label-danger trp" title="Planned">2 Hour(s)</span>
+    // <span id="live_off" class="label label-info trp" title="Actual">00h 04m</span>
+    // <span id="act_off" class="label label-warning trp" title="History">07h 15m</span>
+    const plannedOutage = doc.getElementById('total_off')?.textContent?.trim() || null;
+    const actualOutage = doc.getElementById('live_off')?.textContent?.trim() || null;
+    const historyOutage = doc.getElementById('act_off')?.textContent?.trim() || null;
+
+    return {
+      expectedRestorationTime,
+      plannedOutage,
+      actualOutage,
+      historyOutage,
+    };
+  } catch (err) {
+    console.warn('[CCMS] Failed to fetch restoration time:', err);
+    return null;
+  }
+};
+
+/**
  * Parse complaint table HTML into structured data (client-side)
  * Mirrors the backend cheerio logic but uses DOMParser for browser
  */
