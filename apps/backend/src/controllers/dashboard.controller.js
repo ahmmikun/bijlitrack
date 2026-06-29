@@ -3,7 +3,6 @@ import { ConsumerSnapshot } from '../models/ConsumerSnapshot.js';
 import { BillHistory } from '../models/BillHistory.js';
 import { OutageHistory } from '../models/OutageHistory.js';
 import { AnalysisReport } from '../models/AnalysisReport.js';
-import * as cheerio from 'cheerio';
 
 /**
  * Helper to ensure the user owns the reference
@@ -179,104 +178,5 @@ export const getLatestReport = async (req, res) => {
     res.json(report);
   } catch (error) {
     res.status(404).json({ message: error.message });
-  }
-};
-
-/**
- * Get Expected Restoration Time by scraping CCMS HTML page (server-side)
- * This data is NOT available in the JSON API — only in the rendered HTML.
- * Pattern: <span><b>Expected Restoration Time: </b>03:15 AM</span>
- * 
- * Flow: GET consumer page → extract CSRF _token → POST /getflsinfo
- */
-export const getRestorationTime = async (req, res) => {
-  try {
-    const reference = await verifyOwnership(req.user.id, req.params.referenceId);
-    const referenceNo = reference.referenceNo;
-
-    console.log(`[Dashboard] Fetching restoration time for ${referenceNo}`);
-
-    const HEADERS = {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Origin': 'https://ccms.pitc.com.pk',
-      'Referer': 'https://ccms.pitc.com.pk/',
-    };
-
-    // Step 1: Fetch the consumer page to get CSRF token + cookies
-    const pageResponse = await fetch(`https://ccms.pitc.com.pk/consumer/${referenceNo}`, {
-      headers: HEADERS,
-    });
-    const pageHtml = await pageResponse.text();
-
-    // Extract CSRF token from <meta name="csrf-token" content="..."> or <input name="_token" value="...">
-    let csrfToken = null;
-    const metaMatch = pageHtml.match(/name="csrf-token"\s+content="([^"]+)"/);
-    if (metaMatch) csrfToken = metaMatch[1];
-    if (!csrfToken) {
-      const inputMatch = pageHtml.match(/name="_token"\s+value="([^"]+)"/);
-      if (inputMatch) csrfToken = inputMatch[1];
-    }
-    if (!csrfToken) {
-      const tokenMatch = pageHtml.match(/_token['"]\s*(?:value|content)\s*=\s*['"]([^'"]+)/);
-      if (tokenMatch) csrfToken = tokenMatch[1];
-    }
-
-    // Get cookies from the page response for session
-    const cookies = pageResponse.headers.get('set-cookie') || '';
-
-    if (!csrfToken) {
-      console.warn(`[Dashboard] Could not extract CSRF token for ${referenceNo}`);
-      return res.json({ expectedRestorationTime: null, plannedOutage: null, actualOutage: null, historyOutage: null });
-    }
-
-    // Step 2: POST to getflsinfo with _token + reference + session cookies
-    const postResponse = await fetch('https://ccms.pitc.com.pk/getflsinfo', {
-      method: 'POST',
-      headers: {
-        ...HEADERS,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Accept': 'text/html, */*',
-        ...(cookies ? { 'Cookie': cookies } : {}),
-      },
-      body: `_token=${encodeURIComponent(csrfToken)}&reference=${referenceNo}`,
-    });
-    const html = await postResponse.text();
-
-    if (!html || html.length < 100) {
-      return res.json({ expectedRestorationTime: null, plannedOutage: null, actualOutage: null, historyOutage: null });
-    }
-
-    const $ = cheerio.load(html);
-
-    // Extract Expected Restoration Time
-    let expectedRestorationTime = null;
-    $('b').each((_, el) => {
-      const text = $(el).text();
-      if (text.includes('Expected Restoration Time')) {
-        const parentSpan = $(el).parent();
-        const fullText = parentSpan.text();
-        const time = fullText.replace('Expected Restoration Time:', '').trim();
-        if (time) expectedRestorationTime = time;
-      }
-    });
-
-    // Extract outage summary badges
-    const plannedOutage = $('#total_off').text().trim() || null;
-    const actualOutage = $('#live_off').text().trim() || null;
-    const historyOutage = $('#act_off').text().trim() || null;
-
-    console.log(`[Dashboard] Restoration time for ${referenceNo}: ${expectedRestorationTime || 'N/A'} | Planned: ${plannedOutage} | Actual: ${actualOutage} | History: ${historyOutage}`);
-
-    res.json({
-      expectedRestorationTime,
-      plannedOutage,
-      actualOutage,
-      historyOutage,
-    });
-  } catch (error) {
-    console.error(`[Dashboard] Restoration time error:`, error.message);
-    res.status(500).json({ message: 'Error fetching restoration time', error: error.message });
   }
 };
