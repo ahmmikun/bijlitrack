@@ -9,10 +9,15 @@ import { AnalysisReport } from '../models/AnalysisReport.js';
  * No CCMS calls — frontend handles data fetching
  */
 export const trackReference = async (req, res) => {
-  const { referenceNo, consentGiven, trackingDays } = req.body;
+  let { referenceNo, consentGiven, trackingDays } = req.body;
 
   if (!consentGiven) {
     return res.status(400).json({ message: 'Consent is required for tracking' });
+  }
+
+  // Strip trailing U or R (case-insensitive) — some bills print reference with suffix
+  if (referenceNo) {
+    referenceNo = referenceNo.trim().replace(/[URur]+$/, '');
   }
 
   if (!referenceNo || referenceNo.length !== 14 || !/^\d+$/.test(referenceNo)) {

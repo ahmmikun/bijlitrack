@@ -180,3 +180,134 @@ export const getLatestReport = async (req, res) => {
     res.status(404).json({ message: error.message });
   }
 };
+
+/**
+ * Generate AI-powered analysis report using OpenRouter (DeepSeek)
+ * Limit: 2 reports per user per day
+ */
+export const generateReport = async (req, res) => {
+  try {
+    const reference = await verifyOwnership(req.user.id, req.params.referenceId);
+
+    console.log(`[Report] Generating AI report for ${reference.referenceNo} (user: ${req.user.id})`);
+
+    // Check daily limit: 2 reports per user per day
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const todayReportCount = await AnalysisReport.countDocuments({
+      userId: req.user.id,
+      generatedAt: { $gte: todayStart, $lte: todayEnd }
+    });
+
+    if (todayReportCount >= 2) {
+      return res.status(429).json({ message: 'Daily limit reached. You can generate up to 2 reports per day. Try again tomorrow.' });
+    }
+
+    // Gather data for the report
+    const [billHistory, outageHistory, latestSnapshot] = await Promise.all([
+      BillHistory.find({ referenceId: reference._id }).sort({ billMonth: -1 }).limit(13).lean(),
+      OutageHistory.find({ referenceId: reference._id }).sort({ date: -1 }).limit(30).lean(),
+      ConsumerSnapshot.findOne({ referenceId: reference._id }).sort({ scrapedAt: -1 }).lean(),
+    ]);
+
+    // Build concise data summary for the AI prompt
+    const billSummary = billHistory.map(b => ({
+      month: b.billMonth,
+      amount: b.amountDue,
+      status: b.status,
+    }));
+
+    const outageSummary = outageHistory.map(o => ({
+      date: new Date(o.date).toISOString().split('T')[0],
+      totalMinutes: o.totalOutageMinutes,
+      hours: o.actualOutageHours,
+    }));
+
+    const feederInfo = latestSnapshot?.outageInfo || latestSnapshot?.loadManagementInfo || {};
+    const consumerInfo = latestSnapshot?.consumerInfo || {};
+    const billingInfo = latestSnapshot?.billingInfo?.basicInfo || {};
+
+    const prompt = `You are an electricity consumption analyst for Pakistani consumers. Analyze this data and provide a SHORT, actionable report.
+
+CONSUMER: ${consumerInfo.NAME || 'Unknown'} | Tariff: ${consumerInfo.TARIFF || 'N/A'} | Load: ${consumerInfo.SLOAD || 'N/A'} kW
+FEEDER: ${feederInfo.feederName || 'N/A'} | Grid: ${feederInfo.gridStation || 'N/A'} | Voltage: ${feederInfo.voltage || 0}kV | PF: ${feederInfo.powerFactor || 0}%
+CURRENT BILL: Rs.${billingInfo.netBill || 0} | Units: ${billingInfo.totCurCons || billingInfo.totConsum || 0} kWh | Due: ${billingInfo.billDueDate || 'N/A'}
+
+BILL HISTORY (last 12 months): ${JSON.stringify(billSummary)}
+
+OUTAGE HISTORY (last 30 days): ${JSON.stringify(outageSummary)}
+
+Respond in EXACTLY this JSON format (no markdown, no code blocks, just raw JSON):
+{
+  "summary": "2-3 sentence executive summary of their electricity situation",
+  "billingInsights": ["insight 1", "insight 2", "insight 3"],
+  "outageInsights": ["insight 1", "insight 2", "insight 3"],
+  "recommendations": ["actionable tip 1", "actionable tip 2", "actionable tip 3"]
+}
+
+Keep each insight/recommendation under 20 words. Be specific with numbers. Focus on patterns and anomalies.`;
+
+    // Call Groq API (free tier) — OpenAI-compatible endpoint
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ message: 'AI service not configured. Set GROQ_API_KEY in environment.' });
+    }
+
+    const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-8b-instant',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 800,
+      }),
+    });
+
+    if (!aiResponse.ok) {
+      const errText = await aiResponse.text();
+      console.error(`[Report] Groq API error (${aiResponse.status}): ${errText}`);
+      return res.status(502).json({ message: 'AI service temporarily unavailable. Try again.' });
+    }
+
+    const aiData = await aiResponse.json();
+    const aiContent = aiData.choices?.[0]?.message?.content || '';
+
+    // Parse AI response
+    let parsed;
+    try {
+      // Try to extract JSON from the response (in case AI wraps it in markdown)
+      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
+      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : aiContent);
+    } catch (parseErr) {
+      console.error(`[Report] Failed to parse AI response:`, aiContent);
+      return res.status(500).json({ message: 'Failed to parse AI report. Try again.' });
+    }
+
+    // Save report to DB
+    const report = new AnalysisReport({
+      userId: req.user.id,
+      referenceId: reference._id,
+      reportType: 'daily',
+      summary: parsed.summary || 'Report generated.',
+      billingInsights: parsed.billingInsights || [],
+      outageInsights: parsed.outageInsights || [],
+      recommendations: parsed.recommendations || [],
+      generatedAt: new Date(),
+    });
+    await report.save();
+
+    console.log(`[Report] AI report saved for ${reference.referenceNo} (reportId: ${report._id})`);
+
+    res.status(201).json(report);
+  } catch (error) {
+    console.error(`[Report] Generation error:`, error.message);
+    res.status(500).json({ message: 'Error generating report', error: error.message });
+  }
+};

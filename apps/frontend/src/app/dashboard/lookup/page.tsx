@@ -30,16 +30,20 @@ export default function LookupPage() {
     setLookupResult(null);
     setIsLoading(true);
 
+    // Strip trailing U or R (case-insensitive) from reference number
+    const cleanedRef = referenceNo.replace(/[URur]+$/, '');
+    setReferenceNo(cleanedRef);
+
     try {
       // Fetch directly from CCMS (client-side)
-      const data = await fetchAllCCMSData(referenceNo);
+      const data = await fetchAllCCMSData(cleanedRef);
       
       if (!data.user && !data.bill) {
         throw new Error(data.errors.user || data.errors.bill || 'Failed to fetch details');
       }
 
       setLookupResult({
-        referenceNo,
+        referenceNo: cleanedRef,
         user: data.user,
         bill: data.bill,
         schedule: data.loadInfo,
@@ -104,9 +108,8 @@ export default function LookupPage() {
                   id="referenceNo"
                   placeholder="Enter reference number here..."
                   value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
+                  onChange={(e) => setReferenceNo(e.target.value.trim())}
                   required
-                  pattern="\d{14}"
                   className="w-full h-20 pl-16 pr-8 bg-background border-2 border-border text-foreground text-2xl font-black tracking-[0.1em] rounded-3xl focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30 placeholder:tracking-normal transition-all"
                 />
               </div>
