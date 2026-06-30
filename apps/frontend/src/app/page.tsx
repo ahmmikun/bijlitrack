@@ -47,11 +47,11 @@ export default function Home() {
       />
       {/* Background Decorative Elements */}
       <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none opacity-50 dark:opacity-20">
-        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-[120px] animate-pulse"></div>
-        <div className="absolute top-[20%] -right-[10%] w-[30%] h-[30%] rounded-full bg-indigo-400/20 blur-[100px]"></div>
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-blue-400/20 blur-[120px] animate-pulse"></div>
+        <div className="absolute top-[20%] right-[-10%] w-[30%] h-[30%] rounded-full bg-indigo-400/20 blur-[100px]"></div>
       </div>
 
-      <header className="relative z-50 border-b border-border bg-background/60 backdrop-blur-md sticky top-0">
+      <header className="z-50 border-b border-border bg-background/60 backdrop-blur-md sticky top-0">
         <nav className="flex items-center justify-between p-4 lg:px-12 max-w-7xl mx-auto" aria-label="Global">
           <div className="flex lg:flex-1">
             <Link href="/" className="flex items-center gap-2.5 group">

@@ -110,7 +110,7 @@ export default function LookupPage() {
                   value={referenceNo}
                   onChange={(e) => setReferenceNo(e.target.value.trim())}
                   required
-                  className="w-full h-20 pl-16 pr-8 bg-background border-2 border-border text-foreground text-2xl font-black tracking-[0.1em] rounded-3xl focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30 placeholder:tracking-normal transition-all"
+                  className="w-full h-20 pl-16 pr-8 bg-background border-2 border-border text-foreground text-2xl font-black tracking-widest rounded-3xl focus:ring-4 focus:ring-primary/10 placeholder:text-muted-foreground/30 placeholder:tracking-normal transition-all"
                 />
               </div>
             </div>

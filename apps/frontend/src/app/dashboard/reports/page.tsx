@@ -120,7 +120,7 @@ export default function ReportsPage() {
       {hasReport ? (
         <>
           <Card className="border-border shadow-2xl shadow-foreground/5 bg-card rounded-3xl sm:rounded-[4rem] overflow-hidden group">
-            <div className="h-2.5 w-full bg-gradient-to-r from-primary to-indigo-500"></div>
+            <div className="h-2.5 w-full bg-linear-to-r from-primary to-indigo-500"></div>
             <CardHeader className="p-6 sm:p-10 lg:p-16 border-b border-border bg-muted/20">
               <div className="flex flex-col sm:flex-row justify-between items-start gap-6 sm:gap-8">
                 <div className="space-y-2">

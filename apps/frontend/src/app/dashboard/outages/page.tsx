@@ -351,7 +351,7 @@ export default function OutagesPage() {
                   return (
                     <div key={i} className="flex flex-col items-center gap-0.5 group/hour relative">
                       <div 
-                        className={`w-full aspect-[1/2] rounded-sm sm:rounded-md transition-all hover:scale-110 cursor-default ${bgClass}`}
+                        className={`w-full aspect-1/2 rounded-sm sm:rounded-md transition-all hover:scale-110 cursor-default ${bgClass}`}
                         title={`${formatHour12(i)} - ${mins === 0 ? 'No outage' : `${mins} min outage`}`}
                       />
                       {mins > 0 && (

@@ -709,7 +709,7 @@ export default function ReferenceDetailsPage() {
 
         {/* Diagnostic */}
         <TabsContent value="raw" className="animate-in fade-in slide-in-from-top-4 duration-500 outline-none w-full">
-          <Card className="border-0 shadow-md rounded-2xl bg-[#0d1117] overflow-hidden border border-slate-800 w-full">
+          <Card className="shadow-md rounded-2xl bg-[#0d1117] overflow-hidden border border-slate-800 w-full">
             <CardHeader className="border-b border-slate-800 p-4 sm:p-6 bg-[#0d1117]">
                 <CardTitle className="text-emerald-400/60 font-mono text-[10px] flex items-center gap-2 uppercase">
                     <Terminal className="h-4 w-4 shrink-0" /> Response Data
