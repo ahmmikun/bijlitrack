@@ -1,133 +1,134 @@
 /**
- * CCMS Service - Direct client-side fetcher
- * Calls CCMS/PITC APIs directly from the user's browser/phone
- * This avoids geo-blocking since the request originates from a Pakistani IP
+ * CCMS/PITC consumer portal client.
+ *
+ * Requests are issued from the browser rather than a serverless function
+ * because CCMS geo-blocks datacenter IP ranges; a Pakistani-originated request
+ * from the user's own device is not blocked.
  */
+
+import type {
+  CcmsBillPayload,
+  CcmsBundle,
+  CcmsFeederMeta,
+  CcmsFeederPayload,
+  CcmsUserPayload,
+  FeederStatusSnapshot,
+  ParsedComplaint,
+  ParsedDayOutage,
+  ParsedLoadInfo,
+  RestorationSnapshot,
+} from './ccms.types';
 
 const CCMS_BASE = 'https://ccms.pitc.com.pk';
 
-/**
- * Parse load info data from get-loadinfo API
- */
-const parseLoadInfo = (feederData: any, feederMeta?: any) => {
-  const result: any = {
-    feederCode: feederData.feeder_code || null,
-    feederName: feederData.feeder || null,
-    gridStation: feederData.grid || null,
-    currentStatus: feederData.current_status || null,
-    currentStatusTime: feederData.current_status_time || null,
-    expectedRestorationTime: feederMeta?.time || feederData.expected_restoration_time || null,
-    expectedRestorationDate: feederMeta?.date || null,
-    expectedRestorationDuration: feederMeta?.duration || null,
-    voltage: feederData.voltage || 0,
-    current: feederData.current || 0,
-    activePower: feederData.active_power_kW || 0,
-    powerFactor: feederData.power_factor || 0,
-    eventLogs: feederData.event_logs || [],
+/** Reads a value that may arrive as a string from the upstream JSON. */
+function toNumber(value: unknown): number {
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Narrows an untyped JSON value to an array of numbers. */
+function toNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry));
+}
+
+/** CCMS keys history as `dt_YYYYMMDD`; this normalises that to an ISO date. */
+function toIsoDate(key: string): string | null {
+  const raw = key.replace(/^dt_/, '');
+  if (!/^\d{8}$/.test(raw)) return null;
+  const year = raw.slice(0, 4);
+  const month = raw.slice(4, 6);
+  const day = raw.slice(6, 8);
+  return `${year}-${month}-${day}`;
+}
+
+/** Three-state hourly status derived from minutes of outage in that hour. */
+function toHourlyStatus(minutes: number[]): string[] {
+  return minutes.map((mins) => {
+    if (mins === 0) return 'ON';
+    if (mins >= 60) return 'OFF';
+    return 'PARTIAL';
+  });
+}
+
+function buildDayRecord(
+  date: string,
+  hourlyMinutes: number[],
+  isScheduled: boolean
+): ParsedDayOutage {
+  const totalOutageMinutes = hourlyMinutes.reduce((sum, v) => sum + v, 0);
+  return {
+    date,
+    hourlyOutageMinutes: hourlyMinutes,
+    totalOutageMinutes,
+    totalOutageHours: parseFloat((totalOutageMinutes / 60).toFixed(2)),
+    hourlyStatus: toHourlyStatus(hourlyMinutes),
+    isScheduled,
+  };
+}
+
+/** Today's date in Pakistan Standard Time (UTC+5), not the browser's zone. */
+function todayInPakistan(): string {
+  const now = new Date();
+  const pkOffsetMinutes = 5 * 60;
+  const local = new Date(
+    now.getTime() + (pkOffsetMinutes + now.getTimezoneOffset()) * 60_000
+  );
+  return `${local.getFullYear()}-${String(local.getMonth() + 1).padStart(2, '0')}-${String(
+    local.getDate()
+  ).padStart(2, '0')}`;
+}
+
+const parseLoadInfo = (
+  feederData: CcmsFeederPayload,
+  feederMeta?: CcmsFeederMeta | null
+): ParsedLoadInfo => {
+  const result: ParsedLoadInfo = {
+    feederCode: feederData.feeder_code ?? null,
+    feederName: feederData.feeder ?? null,
+    gridStation: feederData.grid ?? null,
+    currentStatus: feederData.current_status ?? null,
+    currentStatusTime: feederData.current_status_time ?? null,
+    expectedRestorationTime:
+      feederMeta?.time ?? feederData.expected_restoration_time ?? null,
+    expectedRestorationDate: feederMeta?.date ?? null,
+    expectedRestorationDuration: feederMeta?.duration ?? null,
+    voltage: toNumber(feederData.voltage),
+    current: toNumber(feederData.current),
+    activePower: toNumber(feederData.active_power_kW),
+    powerFactor: toNumber(feederData.power_factor),
+    eventLogs: feederData.event_logs ?? [],
     days: {},
-    todaySchedule: feederData.maintenance_sch || [],
-    tripping: feederData.tripping || [],
+    todaySchedule: feederData.maintenance_sch ?? [],
+    tripping: toNumberArray(feederData.tripping),
   };
 
-  // Parse history_data — actual outage minutes per hour per day
-  if (feederData.history_data) {
-    for (const [key, values] of Object.entries(feederData.history_data)) {
-      const dateStr = key.replace('dt_', '');
-      const year = dateStr.slice(0, 4);
-      const month = dateStr.slice(4, 6);
-      const day = dateStr.slice(6, 8);
-      const date = `${year}-${month}-${day}`;
-
-      const hourlyMinutes = Array.isArray(values) ? values as number[] : [];
-      const totalOutageMinutes = hourlyMinutes.reduce((sum, v) => sum + v, 0);
-
-      result.days[date] = {
-        date,
-        hourlyOutageMinutes: hourlyMinutes,
-        totalOutageMinutes,
-        totalOutageHours: parseFloat((totalOutageMinutes / 60).toFixed(2)),
-        hourlyStatus: hourlyMinutes.map(mins => {
-          if (mins === 0) return 'ON';
-          if (mins >= 60) return 'OFF';
-          return 'PARTIAL';
-        }),
-      };
-    }
+  for (const [key, values] of Object.entries(feederData.history_data ?? {})) {
+    const date = toIsoDate(key);
+    if (!date) continue;
+    result.days[date] = buildDayRecord(date, toNumberArray(values), false);
   }
 
-  // Add today's tripping data as today's record (real-time outage for current day)
-  if (feederData.tripping && Array.isArray(feederData.tripping)) {
-    // Use local date (Pakistan Standard Time, UTC+5) not UTC
-    const now = new Date();
-    const pkOffset = 5 * 60; // PKT is UTC+5
-    const localTime = new Date(now.getTime() + (pkOffset + now.getTimezoneOffset()) * 60000);
-    const today = `${localTime.getFullYear()}-${String(localTime.getMonth() + 1).padStart(2, '0')}-${String(localTime.getDate()).padStart(2, '0')}`;
-    
-    const hourlyMinutes = feederData.tripping as number[];
-    const totalOutageMinutes = hourlyMinutes.reduce((sum: number, v: number) => sum + v, 0);
+  // Live tripping data is the current day's record, so it wins over the
+  // history entry whenever it carries equal or greater outage minutes.
+  const tripping = result.tripping;
+  const today = todayInPakistan();
+  const existing = result.days[today];
+  const trippingTotal = tripping.reduce((sum, v) => sum + v, 0);
 
-    // Only set tripping as today's record if today doesn't already have history_data
-    // OR if tripping has more recent/complete data for today
-    if (!result.days[today]) {
-      result.days[today] = {
-        date: today,
-        hourlyOutageMinutes: hourlyMinutes,
-        totalOutageMinutes,
-        totalOutageHours: parseFloat((totalOutageMinutes / 60).toFixed(2)),
-        hourlyStatus: hourlyMinutes.map((mins: number) => {
-          if (mins === 0) return 'ON';
-          if (mins >= 60) return 'OFF';
-          return 'PARTIAL';
-        }),
-      };
-    } else if (totalOutageMinutes > 0) {
-      // Today exists from history_data — merge: use tripping if it has more data
-      // (tripping is real-time and may have newer hours filled in)
-      const existingTotal = result.days[today].totalOutageMinutes || 0;
-      if (totalOutageMinutes >= existingTotal) {
-        result.days[today] = {
-          ...result.days[today],
-          hourlyOutageMinutes: hourlyMinutes,
-          totalOutageMinutes,
-          totalOutageHours: parseFloat((totalOutageMinutes / 60).toFixed(2)),
-          hourlyStatus: hourlyMinutes.map((mins: number) => {
-            if (mins === 0) return 'ON';
-            if (mins >= 60) return 'OFF';
-            return 'PARTIAL';
-          }),
-        };
-      }
-    }
+  if (!existing) {
+    result.days[today] = buildDayRecord(today, tripping, false);
+  } else if (trippingTotal > 0 && trippingTotal >= (existing.totalOutageMinutes || 0)) {
+    result.days[today] = buildDayRecord(today, tripping, false);
   }
 
-  // Parse maintenance_data — scheduled load shedding per day (includes tomorrow)
-  if (feederData.maintenance_data) {
-    for (const [key, values] of Object.entries(feederData.maintenance_data)) {
-      const dateStr = key.replace('dt_', '');
-      const year = dateStr.slice(0, 4);
-      const month = dateStr.slice(4, 6);
-      const day = dateStr.slice(6, 8);
-      const date = `${year}-${month}-${day}`;
-
-      const hourlyMinutes = Array.isArray(values) ? values as number[] : [];
-      const totalScheduledMinutes = hourlyMinutes.reduce((sum, v) => sum + v, 0);
-
-      // If this date doesn't have a record yet (e.g. tomorrow), add it
-      if (!result.days[date]) {
-        result.days[date] = {
-          date,
-          hourlyOutageMinutes: hourlyMinutes, // scheduled = expected outage
-          totalOutageMinutes: totalScheduledMinutes,
-          totalOutageHours: parseFloat((totalScheduledMinutes / 60).toFixed(2)),
-          hourlyStatus: hourlyMinutes.map(mins => {
-            if (mins === 0) return 'ON';
-            if (mins >= 60) return 'OFF';
-            return 'PARTIAL';
-          }),
-          isScheduled: true, // Flag to differentiate from actual data
-        };
-      }
-    }
+  for (const [key, values] of Object.entries(feederData.maintenance_data ?? {})) {
+    const date = toIsoDate(key);
+    if (!date) continue;
+    // Never overwrite recorded actuals with a forward-looking schedule.
+    if (result.days[date]) continue;
+    result.days[date] = buildDayRecord(date, toNumberArray(values), true);
   }
 
   return result;
@@ -136,95 +137,97 @@ const parseLoadInfo = (feederData: any, feederMeta?: any) => {
 /**
  * Fetch user details (consumer info)
  */
-export const fetchUserDetails = async (referenceNo: string) => {
+export const fetchUserDetails = async (
+  referenceNo: string
+): Promise<CcmsUserPayload> => {
   const res = await fetch(`${CCMS_BASE}/api/details/user?reference=${referenceNo}`);
   const data = await res.json();
-  if (data.message !== 'Success') throw new Error(data.message || 'User not found');
-  return data.user;
+  if (data?.message !== 'Success' || !data.user) {
+    throw new Error(data?.message || 'User not found');
+  }
+  return data.user as CcmsUserPayload;
 };
 
-/**
- * Fetch just the feeder status (lightweight, for live polling)
- * Returns: { currentStatus, voltage, powerFactor, currentStatusTime, feederName }
- */
-export const fetchFeederStatus = async (referenceNo: string) => {
+/** Lightweight feeder poll used by the dashboard's live status query. */
+export const fetchFeederStatus = async (
+  referenceNo: string
+): Promise<FeederStatusSnapshot> => {
   const res = await fetch(`${CCMS_BASE}/get-loadinfo/${referenceNo}`);
   const data = await res.json();
-  if (data.message !== 'Success' || !data.load?.[0]?.response?.data?.[0]) {
+  const d = data?.load?.[0]?.response?.data?.[0] as CcmsFeederPayload | undefined;
+  if (data?.message !== 'Success' || !d) {
     throw new Error('Status unavailable');
   }
-  const d = data.load[0].response.data[0];
-  const feederMeta = data.feeder || null;
+  const feederMeta = (data.feeder ?? null) as CcmsFeederMeta | null;
   return {
-    currentStatus: d.current_status || 'OFF',
-    currentStatusTime: d.current_status_time || null,
-    expectedRestorationTime: feederMeta?.time || d.expected_restoration_time || null,
-    expectedRestorationDate: feederMeta?.date || null,
-    expectedRestorationDuration: feederMeta?.duration || null,
-    voltage: d.voltage || 0,
-    powerFactor: d.power_factor || 0,
-    activePower: d.active_power_kW || 0,
-    feederName: d.feeder || null,
+    currentStatus: d.current_status ?? 'OFF',
+    currentStatusTime: d.current_status_time ?? null,
+    expectedRestorationTime: feederMeta?.time ?? d.expected_restoration_time ?? null,
+    expectedRestorationDate: feederMeta?.date ?? null,
+    expectedRestorationDuration: feederMeta?.duration ?? null,
+    voltage: toNumber(d.voltage),
+    powerFactor: toNumber(d.power_factor),
+    activePower: toNumber(d.active_power_kW),
+    feederName: d.feeder ?? null,
   };
 };
 
-/**
- * Fetch bill details
- */
-export const fetchBillDetails = async (referenceNo: string) => {
+export const fetchBillDetails = async (
+  referenceNo: string
+): Promise<CcmsBillPayload | null> => {
   const res = await fetch(`${CCMS_BASE}/api/details/bill?reference=${referenceNo}`);
   const data = await res.json();
-  return data.bill || null;
+  return (data.bill as CcmsBillPayload | null) ?? null;
 };
 
-/**
- * Fetch load info (outages, feeder status, history)
- */
-export const fetchLoadInfo = async (referenceNo: string) => {
+export const fetchLoadInfo = async (referenceNo: string): Promise<ParsedLoadInfo> => {
   const res = await fetch(`${CCMS_BASE}/get-loadinfo/${referenceNo}`);
   const data = await res.json();
-  if (data.message !== 'Success' || !data.load?.[0]?.response?.data?.[0]) {
+  const payload = data?.load?.[0]?.response?.data?.[0] as CcmsFeederPayload | undefined;
+  if (data?.message !== 'Success' || !payload) {
     throw new Error('Load info not available');
   }
-  return parseLoadInfo(data.load[0].response.data[0], data.feeder || null);
+  return parseLoadInfo(payload, (data.feeder ?? null) as CcmsFeederMeta | null);
 };
 
 /**
- * Fetch all data at once (user + bill + load info)
+ * Fetches user, bill and load info together. A partial failure is tolerated:
+ * each branch resolves to null and records its own error rather than rejecting
+ * the whole bundle.
  */
-export const fetchAllCCMSData = async (referenceNo: string) => {
+export const fetchAllCCMSData = async (referenceNo: string): Promise<CcmsBundle> => {
   const [user, bill, loadInfo] = await Promise.allSettled([
     fetchUserDetails(referenceNo),
     fetchBillDetails(referenceNo),
     fetchLoadInfo(referenceNo),
   ]);
 
+  const reason = (result: PromiseRejectedResult): string | null =>
+    result.reason instanceof Error ? result.reason.message : String(result.reason);
+
   return {
     user: user.status === 'fulfilled' ? user.value : null,
     bill: bill.status === 'fulfilled' ? bill.value : null,
     loadInfo: loadInfo.status === 'fulfilled' ? loadInfo.value : null,
     errors: {
-      user: user.status === 'rejected' ? user.reason?.message : null,
-      bill: bill.status === 'rejected' ? bill.reason?.message : null,
-      loadInfo: loadInfo.status === 'rejected' ? loadInfo.reason?.message : null,
-    }
+      user: user.status === 'rejected' ? reason(user) : null,
+      bill: bill.status === 'rejected' ? reason(bill) : null,
+      loadInfo: loadInfo.status === 'rejected' ? reason(loadInfo) : null,
+    },
   };
 };
 
 /**
- * Fetch Expected Restoration Time by scraping the CCMS load management HTML page.
- * This data is ONLY available in the rendered HTML, not in the JSON API.
- * The HTML contains: <span><b>Expected Restoration Time: </b>03:15 AM</span>
- * This only appears when the feeder is OFF.
- * 
- * Strategy: 
- * 1. First fetch the CCMS consumer page to get the CSRF _token
- * 2. Then POST to /getflsinfo with _token + reference
- * 3. Parse HTML response for restoration time
- * Falls back to backend if client-side fails (CORS).
+ * Scrapes Expected Restoration Time from the load-management HTML page. The
+ * value is only present in rendered markup, never in the JSON API, and only
+ * while the feeder is off.
+ *
+ * Requires the XSRF-TOKEN cookie CCMS sets on first contact; without it the
+ * POST is rejected, so this returns null rather than throwing.
  */
-export const fetchExpectedRestorationTime = async (referenceNo: string, refId?: string) => {
-  // Client-side only — uses browser's XSRF-TOKEN cookie from CCMS
+export const fetchExpectedRestorationTime = async (
+  referenceNo: string
+): Promise<RestorationSnapshot | null> => {
   try {
     // Get XSRF-TOKEN from cookie (set by CCMS when user visits any CCMS page/API)
     const cookieMatch = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
@@ -269,88 +272,70 @@ export const fetchExpectedRestorationTime = async (referenceNo: string, refId?: 
 /**
  * Parse the getflsinfo HTML response to extract restoration time and outage stats
  */
-const parseRestorationHTML = (html: string) => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
+const parseRestorationHTML = (html: string): RestorationSnapshot => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
 
-  // Extract Expected Restoration Time
-  // Pattern: <span><b>Expected Restoration Time: </b>03:15 AM</span>
   let expectedRestorationTime: string | null = null;
-
-  const bolds = doc.querySelectorAll('b');
-  for (const bold of bolds) {
-    if (bold.textContent?.includes('Expected Restoration Time')) {
-      const parent = bold.parentElement;
-      if (parent) {
-        const fullText = parent.textContent || '';
-        const time = fullText.replace('Expected Restoration Time:', '').trim();
-        if (time) expectedRestorationTime = time;
-      }
-      break;
-    }
+  for (const bold of doc.querySelectorAll('b')) {
+    if (!bold.textContent?.includes('Expected Restoration Time')) continue;
+    const time = (bold.parentElement?.textContent ?? '')
+      .replace('Expected Restoration Time:', '')
+      .trim();
+    if (time) expectedRestorationTime = time;
+    break;
   }
 
-  // Regex fallback
+  // Fallback for markup where the label is split across elements.
   if (!expectedRestorationTime) {
     const match = html.match(/Expected Restoration Time:\s*<\/b>\s*([^<]+)/i);
     if (match?.[1]) expectedRestorationTime = match[1].trim();
   }
 
-  // Extract outage summary badges
-  const plannedOutage = doc.getElementById('total_off')?.textContent?.trim() || null;
-  const actualOutage = doc.getElementById('live_off')?.textContent?.trim() || null;
-  const historyOutage = doc.getElementById('act_off')?.textContent?.trim() || null;
-
-  return { expectedRestorationTime, plannedOutage, actualOutage, historyOutage };
+  return {
+    expectedRestorationTime,
+    plannedOutage: doc.getElementById('total_off')?.textContent?.trim() || null,
+    actualOutage: doc.getElementById('live_off')?.textContent?.trim() || null,
+    historyOutage: doc.getElementById('act_off')?.textContent?.trim() || null,
+  };
 };
 
 /**
- * Parse complaint table HTML into structured data (client-side)
- * Mirrors the backend cheerio logic but uses DOMParser for browser
+ * Reads the complaint history table. Mirrors the server-side cheerio parser but
+ * runs against DOMParser so it can execute in the browser.
  */
-const parseComplaintHTML = (html: string) => {
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const complaints: any[] = [];
+const parseComplaintHTML = (html: string): ParsedComplaint[] => {
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const complaints: ParsedComplaint[] = [];
 
-  const rows = doc.querySelectorAll('table#dynamic-table tbody tr');
-  rows.forEach((row) => {
+  doc.querySelectorAll('table#dynamic-table tbody tr').forEach((row) => {
     const cells = row.querySelectorAll('td');
     if (cells.length < 7) return;
 
-    const ticketNo = cells[0]?.textContent?.trim() || '';
-    const statusBadge = cells[1]?.querySelector('.badge')?.textContent?.trim() || '';
-    const reopened = cells[1]?.textContent?.includes('Reopened') || false;
-    const refNo = cells[2]?.textContent?.trim() || '';
-    const nature = cells[3]?.textContent?.trim() || '';
-    const type = cells[4]?.textContent?.trim() || '';
-    const source = cells[5]?.textContent?.trim() || '';
-    const feedback = cells[6]?.querySelector('.badge')?.textContent?.trim() || '';
+    const text = (index: number): string => cells[index]?.textContent?.trim() ?? '';
+    const badge = (index: number): string =>
+      cells[index]?.querySelector('.badge')?.textContent?.trim() ?? '';
 
-    // Parse history from last column
     const historyCell = cells[7];
-    const historyEntries: string[] = [];
+    const history: string[] = [];
     if (historyCell) {
-      const historyHTML = historyCell.innerHTML || '';
-      const parts = historyHTML.split(/<br\s*\/?>/i);
-      for (const part of parts) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = part;
-        const clean = tempDiv.textContent?.trim() || '';
-        if (clean) historyEntries.push(clean);
+      for (const part of (historyCell.innerHTML || '').split(/<br\s*\/?>/i)) {
+        const holder = document.createElement('div');
+        holder.innerHTML = part;
+        const clean = holder.textContent?.trim();
+        if (clean) history.push(clean);
       }
     }
 
     complaints.push({
-      ticketNo,
-      status: statusBadge,
-      reopened,
-      refNo,
-      nature,
-      type,
-      source,
-      feedback,
-      history: historyEntries,
+      ticketNo: text(0),
+      status: badge(1),
+      reopened: text(1).includes('Reopened'),
+      refNo: text(2),
+      nature: text(3),
+      type: text(4),
+      source: text(5),
+      feedback: badge(6),
+      history,
     });
   });
 

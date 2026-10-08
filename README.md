@@ -1,207 +1,135 @@
-# ⚡ BijliTrack — Smart Electricity Dashboard
+# BijliTrack
 
-A unified, full-stack Next.js web application that helps Pakistani consumers monitor their electricity bills, power outages, feeder status, and complaint history — all from a single, clean dashboard with seamless 1-click hosting on Vercel.
+Multimodal utility auditing and tariff engine for Pakistani distribution companies (DISCOs).
 
-> **Data Source:** All data is fetched from official [CCMS/PITC](https://ccms.pitc.com.pk) public services.
+BijliTrack reads a consumer's electricity bill, checks the charge breakdown against
+NEPRA tariff rules, and surfaces overbilling. It also tracks feeder outages from the
+CCMS/PITC portal and models the protected-slab cliff so consumers can see a reclassification
+coming before it lands on a bill.
 
-![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs)
-![React](https://img.shields.io/badge/React-19-blue?logo=react)
-![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green?logo=mongodb)
-![Tailwind](https://img.shields.io/badge/Tailwind_CSS-4-38bdf8?logo=tailwindcss)
-![Vercel](https://img.shields.io/badge/Vercel-Ready-black?logo=vercel)
+All DISCO data comes from the public [CCMS/PITC](https://ccms.pitc.com.pk) portal.
+K-Electric is not covered by that portal.
 
----
+## Core Capabilities
 
-## 🎯 What It Does
+- **Multimodal vision bill parser** — extracts the 14-digit reference number, tariff
+  category, consumption split, and the full charge breakdown (cost of electricity, FCA,
+  QTA, electricity duty, sales tax, §235 advance income tax) from a PDF or image.
+- **NEPRA regulatory audit engine** — reconciles itemised charges against the printed
+  total, checks protected-slab entitlement against the 200-unit ceiling, verifies sales
+  tax against the taxable base, and flags §235 advance tax applied outside its scope.
+- **Statutory dispute notice generator** — drafts a petition addressed to the SDO and the
+  NEPRA Consumer Complaints Tribunal, previewable on an A4 sheet with clipboard copy and
+  print-to-PDF export.
+- **Protected slab cliff simulator** — projects end-of-cycle consumption from the current
+  run rate, shows a safe daily budget, and prices the reclassification penalty including
+  GST.
+- **Appliance peak-arbitrage calculator** — prices eight common appliances at peak
+  (Rs. 46.85/kWh) versus off-peak (Rs. 33.10/kWh) and reports the monthly saving from
+  shifting load out of the 5–9 PM window.
+- **Feeder outage radar** — live ON/OFF status, hourly outage minutes, expected restoration
+  time, and complaint history tracking.
 
-| Feature | Description |
-|---------|-------------|
-| **Bill Dashboard** | View current bill, amount due, due date, units consumed, payment status |
-| **Bill History** | 12-month billing history with spending trend charts |
-| **Bill Breakdown** | Detailed company charges (energy, fixed, FPA) and govt taxes (GST, ED, FC surcharge) |
-| **Power Status** | Real-time feeder ON/OFF status, voltage, power factor |
-| **Outage Tracking** | Daily outage monitoring with per-hour breakdown (minutes OFF per hour) |
-| **Outage History** | Multi-day outage records with bar charts and PDF export |
-| **Complaint Tracking** | Search complaints by reference number or ticket number |
-| **Consumer Info** | Name, address, CNIC, meter number, connection type, tariff |
-| **Load Schedule** | 24-hour scheduled maintenance grid |
-| **AI Reports** | Automated Groq AI-generated consumption insights |
-| **Dark/Light Mode** | Full theme support |
+## Tech Stack
 
----
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router, Turbopack) |
+| UI | React 19, Tailwind CSS 4, shadcn/ui, Radix |
+| Language | TypeScript 5 |
+| AI | `@anthropic-ai/sdk` — Claude Sonnet (`claude-sonnet-4-6`) |
+| Data fetching | TanStack Query, axios |
+| Database | MongoDB via Mongoose |
+| Hosting | Vercel (serverless + cron) |
 
-## 🏗️ Architecture (Unified Next.js Full-Stack)
+## Getting Started
 
-The project is structured as a **single, unified Next.js 16 application**:
-
-```
-BijliTrack/
-├── src/
-│   ├── app/
-│   │   ├── api/                  → Next.js Route Handlers (Serverless Backend)
-│   │   │   ├── auth/             → Signup, Login, Password Reset, Profile
-│   │   │   ├── reference/        → Track, list, delete reference numbers
-│   │   │   ├── dashboard/        → Snapshots, bill history, outage history, AI reports
-│   │   │   ├── complaints/       → PITC CCMS complaint scraping
-│   │   │   └── cron/             → Vercel Cron automated daily tracking
-│   │   ├── dashboard/            → Protected dashboard pages
-│   │   ├── (auth)/               → Login, signup, password recovery
-│   │   ├── layout.tsx            → Root layout & providers
-│   │   └── page.tsx              → Landing page
-│   ├── components/               → UI components (shadcn/ui + Radix + Tailwind 4)
-│   ├── hooks/                    → Custom React hooks (useAuth)
-│   └── lib/
-│       ├── api.ts                → Axios client (same-origin /api calls)
-│       ├── ccms.ts               → Direct client-side CCMS fetcher
-│       └── server/               → Serverless utilities (Mongoose, Auth, Services)
-│           ├── db.ts             → Cached MongoDB connection pooling
-│           ├── auth.ts           → JWT token validation & bcryptjs
-│           ├── models/           → Mongoose schemas (User, Reference, Bill, Outage, etc.)
-│           └── services/         → CCMS scraping, Nodemailer, Outage synchronization
-├── public/                       → Static assets
-├── vercel.json                   → Vercel Cron configuration
-└── package.json                  → Dependencies & build scripts
-```
-
-### Key Highlights
-- **No Separate Backend Server Needed**: The API runs as native Next.js Route Handlers (`/api/*`) on Vercel Serverless Functions.
-- **Zero CORS Issues**: All client requests resolve directly to `/api/...` on the same domain.
-- **Automated Outage Cron Job**: Uses Vercel Cron (`vercel.json`) to trigger daily tracking without needing a 24/7 background process.
-
----
-
-## 🚀 Getting Started Locally
-
-### Prerequisites
-- Node.js 18+
-- MongoDB database (local or MongoDB Atlas)
-
-### Installation
+Prerequisites: Node.js >= 20 and npm (or pnpm).
 
 ```bash
-# Clone the repository
-git clone https://github.com/ahmmikun/Lesco-Electricity-Moniter.git
-cd Lesco-Electricity-Moniter
-
-# Install all dependencies
+git clone https://github.com/ahmmikun/bijlitrack.git
+cd bijlitrack
 npm install
-```
-
-### Environment Configuration
-
-Create a `.env.local` file in the root directory (or copy from `.env.example`):
-
-```env
-# MongoDB Atlas Connection URI
-MONGODB_URI=mongodb+srv://<username>:<password>@<cluster>.mongodb.net/bijlitrack?retryWrites=true&w=majority
-
-# JWT Secret for Session Authentication
-JWT_SECRET=your-secure-random-jwt-secret-key-here
-
-# Optional: Groq API Key for AI Analysis Reports
-GROQ_API_KEY=gsk_your_groq_api_key
-
-# Optional: Vercel Cron authorization secret
-CRON_SECRET=your-random-cron-secret-token
-
-# Optional: SMTP Email service for password reset emails
-APP_NAME=BijliTrack
-MAIL_FROM="BijliTrack <no-reply@example.com>"
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=465
-SMTP_SECURE=true
-SMTP_USER=your-email@example.com
-SMTP_PASS=your-app-password
-```
-
-### Running Locally
-
-```bash
+cp .env.example .env.local   # then fill in the values below
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) to view the application and APIs.
+The app runs at `http://localhost:3000`.
 
----
+### Verification
 
-## 🚢 Deploying to Vercel (1-Click)
+```bash
+npx tsc --noEmit      # type check, no emit
+npm run build         # production build
+npx eslint src        # lint
+```
 
-Because BijliTrack is a standard unified Next.js project, deploying to Vercel requires zero complex setup:
+`next build` runs the TypeScript check but not ESLint — lint is a separate step.
 
-1. Push your repository to GitHub.
-2. Go to [vercel.com](https://vercel.com) and click **"Add New Project"**.
-3. Import your **BijliTrack** repository (Vercel will automatically detect **Next.js**).
-4. Add the following **Environment Variables** in the Vercel dashboard:
-   - `MONGODB_URI` — Your MongoDB Atlas connection string
-   - `JWT_SECRET` — A secure random string for JWT token generation
-   - `GROQ_API_KEY` (Optional) — For AI report generation
-   - `CRON_SECRET` (Optional) — Secret to protect the `/api/cron/daily-tracker` endpoint
-   - SMTP variables (`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, etc., optional for password resets)
-5. Click **Deploy**.
+## Environment Variables
 
-That's it! Your entire full-stack application (frontend + API + database connection + cron jobs) is live.
+| Variable | Required | Purpose |
+|---|---|---|
+| `MONGODB_URI` | yes | MongoDB Atlas connection string for references, outages and reports |
+| `JWT_SECRET` | yes | Signing secret for session tokens |
+| `ANTHROPIC_API_KEY` | for AI features | Claude API access for bill parsing, dispute generation and the bill roast |
+| `ANTHROPIC_MODEL` | no | Overrides the vision model. Defaults to `claude-sonnet-4-6` |
+| `CRON_SECRET` | for cron | Bearer token Vercel Cron must present to `/api/cron/*` |
+| `JWT_SECRET`, `SMTP_*` | no | Password-reset email |
 
----
+If `CRON_SECRET` is set, the cron routes require `Authorization: Bearer <secret>` in every
+environment. If it is unset, `/api/cron/daily-audit` refuses to run in production rather
+than falling open.
 
-## 📡 API Endpoints
+## Architecture
 
-### Auth
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/signup` | Register new user |
-| POST | `/api/auth/login` | Login, get JWT |
-| POST | `/api/auth/forgot-password` | Email password reset link |
-| POST | `/api/auth/reset-password` | Set new password from reset token |
-| GET | `/api/auth/me` | Get current user (protected) |
+```
+src/
+  app/
+    api/                 Route handlers
+      audit/parse        Vision extraction + audit (4.5MB cap, magic-byte verified)
+      audit/generate-dispute  Petition drafting
+      audit/roast        Consumer-facing commentary
+      cron/              Vercel cron targets, CRON_SECRET guarded
+    dashboard/           Authenticated app shell
+  lib/
+    claude/              Anthropic integration
+      billSchema.ts        Zod contract for the extraction result
+      visionParser.ts      Structured vision call
+      auditEngine.ts       NEPRA rule checks, pure and testable
+      disputeGenerator.ts  Petition drafting
+    tariff/              Pure tariff maths, no React
+      slabCalculator.ts    Telescopic slabs and the 200-unit cliff
+      applianceCalculator.ts  Run-cost and peak shifting
+    ccms.ts              CCMS/PITC portal client (browser-side)
+    ccms.types.ts        Upstream response and parsed shapes
+    server/              Mongoose models, auth, DB connection
+```
 
-### Reference Management (Protected)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/reference/track` | Start tracking a reference number |
-| GET | `/api/reference/my` | Get user's tracked references |
-| DELETE | `/api/reference/:id` | Remove tracked reference + all data |
+### Design Notes
 
-### Dashboard (Protected)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/dashboard/:refId` | Get latest saved snapshot |
-| POST | `/api/dashboard/:refId/save` | Save CCMS data snapshot |
-| GET | `/api/dashboard/:refId/billing` | Bill history records |
-| GET | `/api/dashboard/:refId/outages` | Outage history with hourly data |
-| GET | `/api/dashboard/:refId/report` | Latest AI analysis report |
-| POST | `/api/dashboard/:refId/report/generate` | Generate AI report (Groq) |
+- **Tariff maths is pure and isolated.** `src/lib/tariff/` has no React or I/O, so the slab
+  and appliance calculations are unit-testable and cannot drift between the simulator UI
+  and server-side advisory logic.
+- **CCMS is called from the browser, not a serverless function.** CCMS geo-blocks
+  datacenter IP ranges, so proxying through Vercel functions fails.
+- **Bill uploads are verified by content, not by the client's declared MIME type.** The
+  decoded payload's magic bytes must match the declared media type before anything is
+  forwarded to the Anthropic API.
+- **Slab rates and tax percentages are estimates.** NEPRA revises both between tariff
+  cycles. They are named constants, surfaced in the UI, and must be checked against the
+  current tariff schedule before being relied on.
 
-### Complaints (Protected)
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/complaints/track-by-reference?referenceNo=...` | Complaint history by reference |
-| GET | `/api/complaints/track-by-ticket?ticketNo=...` | Track by ticket number |
+## Accuracy and Limitations
 
-### Cron
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/cron/daily-tracker` | Daily outage synchronization job (Vercel Cron) |
+The audit engine and dispute generator produce advisory output. Extracted figures come
+from visual model inference and can be wrong on low-quality scans — the parser returns a
+confidence score and per-field warnings, and surfaces them in the report.
 
----
+Dispute notices instruct the model to mark uncertain statutory citations as
+`[VERIFY CITATION]` rather than invent SRO numbers, since a fabricated citation in a filed
+petition would harm the consumer. Verify all citations before submitting.
 
-## 🌐 Supported DISCOs
+## License
 
-BijliTrack works with all PITC/CCMS supported public-sector DISCOs:
-
-`LESCO` `GEPCO` `FESCO` `IESCO` `MEPCO` `PESCO` `HESCO` `SEPCO` `QESCO` `TESCO` `AJ&K`
-
-> ⚠️ **K-Electric is NOT supported** as it uses a separate private infrastructure.
-
----
-
-## ⚠️ Disclaimer
-
-BijliTrack is an **independent utility dashboard**. It is NOT an official government website and is NOT affiliated with PITC, WAPDA, or any electricity distribution company.
-
-Data is collected from publicly available official CCMS/PITC services. We do not own, modify, or guarantee the accuracy of the official data.
-
----
-
-## 📄 License
-
-ISC
+MIT — see [LICENSE](./LICENSE).

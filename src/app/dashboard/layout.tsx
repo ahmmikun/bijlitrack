@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { LayoutDashboard, Receipt, Zap, FileText, Settings, LogOut, Menu, ChevronDown, Check, Bell, Search, MessageSquareWarning, Info } from 'lucide-react';
+import { LayoutDashboard, Receipt, Zap, FileText, Settings, LogOut, Menu, ChevronDown, Check, Bell, Search, MessageSquareWarning, Info, ShieldCheck, Gauge } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from '@/components/ui/sheet';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -17,6 +17,8 @@ const navigation = [
   { name: 'Bill History', href: '/dashboard/billing', icon: Receipt },
   { name: 'Outages & Load', href: '/dashboard/outages', icon: Zap },
   { name: 'Complaints', href: '/dashboard/complaints', icon: MessageSquareWarning },
+  { name: 'Bill Audit', href: '/dashboard/audit', icon: ShieldCheck },
+  { name: 'Slab Simulator', href: '/dashboard/simulator', icon: Gauge },
   { name: 'Reports', href: '/dashboard/reports', icon: FileText },
   { name: 'About', href: '/dashboard/about', icon: Info },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },

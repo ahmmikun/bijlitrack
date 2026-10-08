@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/daily-tracker",
+      "path": "/api/cron/daily-audit",
       "schedule": "0 3 * * *"
     }
   ]

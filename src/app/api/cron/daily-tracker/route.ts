@@ -57,15 +57,16 @@ export async function GET(req: NextRequest) {
 
         // Small 1s delay
         await new Promise((resolve) => setTimeout(resolve, 1000));
-      } catch (err: any) {
+      } catch (err: unknown) {
         failCount++;
-        console.error(`[Cron] Failed for ${ref.referenceNo}:`, err.message);
+        const reason = err instanceof Error ? err.message : 'Unknown sync failure';
+        console.error(`[Cron] Failed for ${ref.referenceNo}:`, reason);
 
         await ScraperLog.create({
           jobType: 'daily_outage_track',
           status: 'failed',
           referenceLast4: ref.referenceNoLast4,
-          errorDetails: err.message,
+          errorDetails: reason,
           startedAt: jobStartTime,
           finishedAt: new Date(),
         });
@@ -80,10 +81,15 @@ export async function GET(req: NextRequest) {
       failCount,
       expiredCount,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('[Cron Error]', error);
     return NextResponse.json(
-      { message: error.message || 'Critical error in tracking job' },
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : 'Critical error in tracking job',
+      },
       { status: 500 }
     );
   }
