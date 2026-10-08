@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import Anthropic from '@anthropic-ai/sdk';
-import { getVisionModel } from '@/lib/claude/visionParser';
+import { generateRoast, isAIConfigured } from '@/lib/ai/provider';
 
 export const runtime = 'nodejs';
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
-
-const MAX_TOKENS = 600;
 
 const RoastRequestSchema = z.object({
   totalUnits: z
@@ -20,37 +17,6 @@ const RoastRequestSchema = z.object({
   isProtected: z.boolean(),
   billingMonth: z.string().min(1).max(60),
 });
-
-const SYSTEM_PROMPT = `You write short, funny electricity bill commentary for a Pakistani consumer app called BijliTrack.
-
-Tone:
-- Warm and self-deprecating. Roast the consumer's habits, never their intelligence, never their finances in a cruel way, and never their family or religion.
-- Use light Pakistani cultural texture naturally: LESCO and K-Electric names, load shedding frustration, geyser season, AC economics, "protected slab" anxiety, summer temperature complaints.
-- Genuinely funny. Do not be corny or forced. Two sentences maximum for the roast.
-
-Structure (output plain text, no markdown headings or bold):
-- First: exactly 2 punchy sentences roasting the consumption profile. Ground it in the actual numbers given.
-- Then a line "Tips to cut your bill:" followed by exactly 2 bullet points starting with "- ".
-
-Hard rules:
-- Do not invent line items or figures. Only reference numbers supplied in the prompt.
-- Tips must be realistic for a Pakistani household and actionable within one billing cycle.
-- If consumption is modest, roast mildly rather than inventing a problem.
-- No medical, legal, or financial advice. No mention of other people's data.
-- Plain text only. No code fences, no emoji.`;
-
-let client: Anthropic | null = null;
-
-function getClient(): Anthropic {
-  if (!client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim();
-    if (!apiKey) {
-      throw new Error('ANTHROPIC_API_KEY is not configured');
-    }
-    client = new Anthropic({ apiKey });
-  }
-  return client;
-}
 
 export async function POST(req: NextRequest) {
   let raw: unknown;
@@ -78,11 +44,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Roast service is not configured. Set ANTHROPIC_API_KEY.',
+        error:
+          'Roast service is not configured. Set ANTHROPIC_API_KEY (main) or GEMINI_API_KEY (fallback).',
       },
       { status: 503 }
     );
@@ -107,24 +74,7 @@ Daily average: ${dailyAverage.toFixed(1)} kWh/day
 Write the roast now.`;
 
   try {
-    const anthropic = getClient();
-    const message = await anthropic.messages.create({
-      model: getVisionModel(),
-      max_tokens: MAX_TOKENS,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: userPrompt }],
-    });
-
-    const roast = message.content
-      .filter((block) => block.type === 'text')
-      .map((block) => block.text)
-      .join('')
-      .trim();
-
-    if (!roast) {
-      throw new Error('Claude returned an empty roast');
-    }
-
+    const roast = await generateRoast(userPrompt);
     return NextResponse.json({ success: true, roast });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -133,7 +83,7 @@ Write the roast now.`;
       {
         success: false,
         error:
-          message.includes('ANTHROPIC_API_KEY')
+          message.includes('API_KEY') || message.includes('configured')
             ? message
             : 'Could not generate the roast right now.',
       },

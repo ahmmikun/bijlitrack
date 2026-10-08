@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { DisputeRequestSchema } from '@/lib/claude/disputeSchema';
-import { generateDisputeLetter } from '@/lib/claude/disputeGenerator';
+import { generateDispute, isAIConfigured } from '@/lib/ai/provider';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -32,18 +32,19 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Dispute generator is not configured. Set ANTHROPIC_API_KEY.',
+        error:
+          'Dispute generator is not configured. Set ANTHROPIC_API_KEY (main) or GEMINI_API_KEY (fallback).',
       },
       { status: 503 }
     );
   }
 
   try {
-    const disputeLetter = await generateDisputeLetter(parsed.data);
+    const disputeLetter = await generateDispute(parsed.data);
     return NextResponse.json({ success: true, disputeLetter });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error:
-          message.includes('ANTHROPIC_API_KEY')
+          message.includes('API_KEY') || message.includes('configured')
             ? message
             : 'Could not draft the dispute notice. Please try again.',
       },

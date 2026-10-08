@@ -16,7 +16,7 @@ export default function AuditPage() {
         </h1>
         <div className="text-muted-foreground font-bold uppercase text-[10px] sm:text-xs tracking-[0.2em] sm:tracking-[0.3em] flex items-center justify-center sm:justify-start gap-2">
           <div className="h-1.5 w-1.5 rounded-full bg-primary shadow-[0_0_8px_currentColor]"></div>
-          Claude Vision Multilateral Bill Verification
+          Multimodal AI Bill Verification (Gemini / Claude)
         </div>
       </div>
 

@@ -99,52 +99,28 @@ Respond in EXACTLY this JSON format (no markdown, no code blocks, just raw JSON)
 
 Keep each insight/recommendation under 20 words. Be specific with numbers. Focus on patterns and anomalies.`;
 
-    const apiKey = process.env.GROQ_API_KEY?.trim();
-    if (!apiKey) {
+    const { isAIConfigured, generateDailyReport } = await import(
+      '@/lib/ai/provider'
+    );
+
+    if (!isAIConfigured()) {
       return NextResponse.json(
         {
           message:
-            'AI report service is not configured. Set GROQ_API_KEY in environment variables.',
+            'AI report service is not configured. Set ANTHROPIC_API_KEY (main) or GEMINI_API_KEY (fallback) in environment variables.',
         },
         { status: 503 }
       );
     }
 
-    const aiResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 800,
-      }),
-    });
-
-    if (!aiResponse.ok) {
-      const errText = await aiResponse.text();
-      console.error(`[Report] Groq API error (${aiResponse.status}): ${errText}`);
-      return NextResponse.json(
-        { message: 'AI service temporarily unavailable. Try again.' },
-        { status: 502 }
-      );
-    }
-
-    const aiData = await aiResponse.json();
-    const aiContent = aiData.choices?.[0]?.message?.content || '';
-
-    let parsed: any;
+    let parsed;
     try {
-      const jsonMatch = aiContent.match(/\{[\s\S]*\}/);
-      parsed = JSON.parse(jsonMatch ? jsonMatch[0] : aiContent);
-    } catch {
-      console.error('[Report] Failed to parse AI response:', aiContent);
+      parsed = await generateDailyReport(prompt);
+    } catch (err: unknown) {
+      console.error('[Report] AI report generation failed:', err);
       return NextResponse.json(
-        { message: 'Failed to parse AI report. Try again.' },
-        { status: 500 }
+        { message: 'Failed to generate AI report. Try again.' },
+        { status: 502 }
       );
     }
 
@@ -161,10 +137,11 @@ Keep each insight/recommendation under 20 words. Be specific with numbers. Focus
     await report.save();
 
     return NextResponse.json(report, { status: 201 });
-  } catch (error: any) {
-    const status = error.message.includes('Not authorized') ? 401 : 500;
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    const status = message.includes('Not authorized') ? 401 : 500;
     return NextResponse.json(
-      { message: error.message || 'Error generating report' },
+      { message: message || 'Error generating report' },
       { status }
     );
   }

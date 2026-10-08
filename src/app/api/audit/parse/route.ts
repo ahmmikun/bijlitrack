@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isBillMediaType } from '@/lib/claude/billSchema';
-import { parseUtilityBillWithClaude } from '@/lib/claude/visionParser';
+import { parseUtilityBill, isAIConfigured } from '@/lib/ai/provider';
 import { auditBill } from '@/lib/claude/auditEngine';
 
 export const runtime = 'nodejs';
@@ -142,30 +142,37 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!isAIConfigured()) {
     return NextResponse.json(
       {
         success: false,
-        error: 'Bill audit service is not configured. Set ANTHROPIC_API_KEY.',
+        error:
+          'Bill audit service is not configured. Set ANTHROPIC_API_KEY (main) or GEMINI_API_KEY (fallback).',
       },
       { status: 503 }
     );
   }
 
   try {
-    const billData = await parseUtilityBillWithClaude(base64, mediaType);
+    const { billData, provider, model } = await parseUtilityBill(base64, mediaType);
     const auditFindings = auditBill(billData);
 
-    return NextResponse.json({ success: true, billData, auditFindings });
+    return NextResponse.json({
+      success: true,
+      billData,
+      auditFindings,
+      provider,
+      model,
+    });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error('[Audit] Claude parse failed:', message);
+    console.error('[Audit] Bill parse failed:', error);
     return NextResponse.json(
       {
         success: false,
-        error: message.includes('ANTHROPIC_API_KEY')
-          ? message
-          : 'Failed to parse this bill. It may be too low-resolution to read.',
+        error:
+          message ||
+          'Failed to parse this bill. Please ensure it is legible and try again.',
       },
       { status: 502 }
     );
