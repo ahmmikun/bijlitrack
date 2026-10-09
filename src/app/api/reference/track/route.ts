@@ -9,7 +9,8 @@ export async function POST(req: NextRequest) {
     await connectDB();
 
     const body = await req.json();
-    let { referenceNo, consentGiven, trackingDays } = body;
+    const { consentGiven, trackingDays } = body;
+    let { referenceNo } = body;
 
     if (!consentGiven) {
       return NextResponse.json(

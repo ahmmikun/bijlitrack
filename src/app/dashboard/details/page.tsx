@@ -132,7 +132,7 @@ export default function ReferenceDetailsPage() {
           <div className="ml-3">
              <AlertTitle className="text-base font-bold uppercase">Account Not Found</AlertTitle>
              <AlertDescription className="mt-1 font-medium opacity-80 leading-relaxed uppercase text-[10px] tracking-widest">
-               We couldn't retrieve the information for this reference number.
+               We couldn&apos;t retrieve the information for this reference number.
              </AlertDescription>
           </div>
         </Alert>
