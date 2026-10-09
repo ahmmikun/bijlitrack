@@ -7,15 +7,21 @@ export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
 const RoastRequestSchema = z.object({
-  totalUnits: z
+  totalUnits: z.coerce
     .number()
-    .int('totalUnits must be a whole number of kWh')
-    .positive('totalUnits must be greater than zero')
-    .max(100_000, 'totalUnits exceeds the plausible maximum for one billing cycle'),
-  totalAmount: z.number().nonnegative('totalAmount cannot be negative'),
-  disco: z.string().min(1).max(120),
-  isProtected: z.boolean(),
-  billingMonth: z.string().min(1).max(60),
+    .nonnegative('totalUnits cannot be negative')
+    .max(100_000, 'totalUnits exceeds the plausible maximum for one billing cycle')
+    .default(0),
+  totalAmount: z.coerce.number().default(0),
+  disco: z
+    .string()
+    .nullish()
+    .transform((val) => (val && val.trim().length > 0 ? val.trim() : 'LESCO')),
+  isProtected: z.coerce.boolean().default(false),
+  billingMonth: z
+    .string()
+    .nullish()
+    .transform((val) => (val && val.trim().length > 0 ? val.trim() : 'Current Month')),
 });
 
 export async function POST(req: NextRequest) {
@@ -31,6 +37,10 @@ export async function POST(req: NextRequest) {
 
   const parsed = RoastRequestSchema.safeParse(raw);
   if (!parsed.success) {
+    console.warn('[Roast] Invalid payload received:', {
+      issues: parsed.error.issues,
+      rawPayload: raw,
+    });
     return NextResponse.json(
       {
         success: false,
@@ -58,16 +68,17 @@ export async function POST(req: NextRequest) {
   const { totalUnits, totalAmount, disco, isProtected, billingMonth } =
     parsed.data;
 
-  const unitRate = totalUnits > 0 ? totalAmount / totalUnits : 0;
-  const dailyAverage = totalUnits / 30;
+  const roundedUnits = Math.round(totalUnits);
+  const unitRate = roundedUnits > 0 ? totalAmount / roundedUnits : 0;
+  const dailyAverage = roundedUnits / 30;
 
   const userPrompt = `Roast this bill.
 
 DISCO: ${disco}
 Billing month: ${billingMonth}
 Protected consumer: ${isProtected ? 'yes' : 'no'}
-Total units consumed: ${totalUnits.toLocaleString('en-PK')} kWh
-Total billed: PKR ${totalAmount.toLocaleString('en-PK')}
+Total units consumed: ${roundedUnits.toLocaleString('en-PK')} kWh
+Total billed: PKR ${Math.round(totalAmount).toLocaleString('en-PK')}
 Implied all-in rate: PKR ${unitRate.toFixed(2)} per kWh
 Daily average: ${dailyAverage.toFixed(1)} kWh/day
 

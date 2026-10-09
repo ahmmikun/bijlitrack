@@ -165,11 +165,11 @@ export function AuditReportCard({ billData, auditFindings }: AuditReportCardProp
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          totalUnits: billData.consumption.totalUnits,
-          totalAmount: billData.financialBreakdown.totalAmount,
-          disco: billData.consumer.disco,
-          isProtected: billData.tariff.isProtected,
-          billingMonth: billData.consumer.billingMonth,
+          totalUnits: Math.max(0, Math.round(Number(billData?.consumption?.totalUnits) || 0)),
+          totalAmount: Number(billData?.financialBreakdown?.totalAmount) || 0,
+          disco: billData?.consumer?.disco?.trim() || 'LESCO',
+          isProtected: Boolean(billData?.tariff?.isProtected),
+          billingMonth: billData?.consumer?.billingMonth?.trim() || 'Current Month',
         }),
       });
 
@@ -177,10 +177,14 @@ export function AuditReportCard({ billData, auditFindings }: AuditReportCardProp
         success: boolean;
         roast?: string;
         error?: string;
+        details?: Array<{ path: string; message: string }>;
       };
 
       if (!res.ok || !data.success || !data.roast) {
-        setRoastError(data.error || 'Could not generate the roast.');
+        const detailMsg = data.details?.map((d) => `${d.path}: ${d.message}`).join(', ');
+        setRoastError(
+          detailMsg ? `${data.error || 'Failed'} (${detailMsg})` : (data.error || 'Could not generate the roast.')
+        );
         return;
       }
 
