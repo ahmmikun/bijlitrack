@@ -117,7 +117,9 @@ function ResetPasswordForm() {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
-                  id="password"
+                  id="password" 
+                  name="password"
+                  autoComplete="new-password"
                   type="password"
                   placeholder="Min. 8 characters"
                   required
@@ -132,7 +134,9 @@ function ResetPasswordForm() {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
-                  id="confirmPassword"
+                  id="confirmPassword" 
+                  name="confirmPassword"
+                  autoComplete="new-password"
                   type="password"
                   placeholder="Repeat new password"
                   required

@@ -89,7 +89,9 @@ export default function ForgotPasswordPage() {
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input
-                  id="email"
+                  id="email" 
+                  name="email"
+                  autoComplete="email"
                   type="email"
                   placeholder="name@company.com"
                   required

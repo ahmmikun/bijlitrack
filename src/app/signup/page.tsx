@@ -80,6 +80,8 @@ export default function SignupPage() {
                 <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
                   id="name" 
+                  name="name"
+                  autoComplete="name" 
                   type="text" 
                   placeholder="e.g. Ali Ahmed" 
                   required 
@@ -95,6 +97,8 @@ export default function SignupPage() {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
                   id="email" 
+                  name="email"
+                  autoComplete="email" 
                   type="email" 
                   placeholder="ali@example.com" 
                   required 
@@ -110,6 +114,8 @@ export default function SignupPage() {
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
                   id="password" 
+                  name="password"
+                  autoComplete="new-password" 
                   type="password" 
                   placeholder="Min. 8 characters"
                   required 

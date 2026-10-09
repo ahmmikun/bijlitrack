@@ -80,6 +80,8 @@ export default function LoginPage() {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
                   id="email" 
+                  name="email"
+                  autoComplete="email" 
                   type="email" 
                   placeholder="name@company.com" 
                   required 
@@ -100,6 +102,8 @@ export default function LoginPage() {
                 <Key className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                 <Input 
                   id="password" 
+                  name="password"
+                  autoComplete="current-password" 
                   type="password" 
                   placeholder="••••••••"
                   required 
