@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
@@ -9,7 +9,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from '@/components/ui/skeleton';
 import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { AlertCircle, History, Receipt, Info, TrendingUp, Calendar, CalendarClock, ExternalLink, Printer } from 'lucide-react';
+import {
+  AlertCircle,
+  History,
+  Receipt,
+  Info,
+  TrendingUp,
+  Calendar,
+  CalendarClock,
+  ExternalLink,
+  Printer,
+  Copy,
+  Check,
+} from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -97,7 +109,7 @@ export default function BillingPage() {
 
       <div className="grid gap-8 sm:gap-12">
         {/* Print Bill Section */}
-        <BillPrintSection />
+        <BillPrintSection activeRef={activeRef} />
 
         {/* Chart Card */}
         <Card className="border-border shadow-2xl shadow-foreground/5 bg-card rounded-3xl sm:rounded-[3rem] overflow-hidden group">
@@ -231,26 +243,62 @@ export default function BillingPage() {
   );
 }
 
-function BillPrintSection() {
+function BillPrintSection({ activeRef }: { activeRef: string | null }) {
   const [selectedCompany, setSelectedCompany] = useState('lesco');
+  const [copied, setCopied] = useState(false);
 
-  const companies = [
-    { code: 'lesco', name: 'LESCO', fullName: 'Lahore Electric Supply Company', color: '#0ea5e9' },
-    { code: 'gepco', name: 'GEPCO', fullName: 'Gujranwala Electric Power Company', color: '#22c55e' },
-    { code: 'fesco', name: 'FESCO', fullName: 'Faisalabad Electric Supply Company', color: '#f59e0b' },
-    { code: 'iesco', name: 'IESCO', fullName: 'Islamabad Electric Supply Company', color: '#6366f1' },
-    { code: 'mepco', name: 'MEPCO', fullName: 'Multan Electric Power Company', color: '#14b8a6' },
-    { code: 'pesco', name: 'PESCO', fullName: 'Peshawar Electric Supply Company', color: '#ec4899' },
-    { code: 'hazeco', name: 'HAZECO', fullName: 'Hazara Electric Supply Company', color: '#8b5cf6' },
-    { code: 'hesco', name: 'HESCO', fullName: 'Hyderabad Electric Supply Company', color: '#ef4444' },
-    { code: 'sepco', name: 'SEPCO', fullName: 'Sukkur Electric Power Company', color: '#06b6d4' },
-    { code: 'qesco', name: 'QESCO', fullName: 'Quetta Electric Supply Company', color: '#84cc16' },
-    { code: 'tesco', name: 'TESCO', fullName: 'Tribal Electric Supply Company', color: '#f97316' },
+  useEffect(() => {
+    const saved = localStorage.getItem('billDisco');
+    if (saved) setSelectedCompany(saved);
+  }, []);
+
+  const { data: references } = useQuery({
+    queryKey: ['my-references'],
+    queryFn: async () => {
+      const res = await api.get('/reference/my');
+      return Array.isArray(res.data) ? res.data : [];
+    },
+  });
+  const referenceNo: string | undefined = references?.find((r: any) => r._id === activeRef)?.referenceNo;
+
+  const companies: { code: string; name: string; color: string; direct?: boolean }[] = [
+    { code: 'lesco', name: 'Lahore Electric Supply Company', color: '#0ea5e9', direct: true },
+    { code: 'gepco', name: 'Gujranwala Electric Power Company', color: '#22c55e' },
+    { code: 'fesco', name: 'Faisalabad Electric Supply Company', color: '#f59e0b' },
+    { code: 'iesco', name: 'Islamabad Electric Supply Company', color: '#6366f1' },
+    { code: 'mepco', name: 'Multan Electric Power Company', color: '#14b8a6' },
+    { code: 'pesco', name: 'Peshawar Electric Supply Company', color: '#ec4899' },
+    { code: 'hazeco', name: 'Hazara Electric Supply Company', color: '#8b5cf6' },
+    { code: 'hesco', name: 'Hyderabad Electric Supply Company', color: '#ef4444' },
+    { code: 'sepco', name: 'Sukkur Electric Power Company', color: '#06b6d4' },
+    { code: 'qesco', name: 'Quetta Electric Supply Company', color: '#84cc16' },
+    { code: 'tesco', name: 'Tribal Electric Supply Company', color: '#f97316' },
   ];
 
-  const handleGo = () => {
-    window.open(`https://bill.pitc.com.pk/${selectedCompany}bill`, '_blank');
+  const handleCompanyChange = (code: string) => {
+    setSelectedCompany(code);
+    localStorage.setItem('billDisco', code);
   };
+
+  const handleCopy = async () => {
+    if (!referenceNo) return;
+    await navigator.clipboard.writeText(referenceNo);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handlePrintPdf = () => {
+    if (!referenceNo) return;
+    window.open(`/api/official-bill-print?referenceNo=${encodeURIComponent(referenceNo)}`, '_blank');
+  };
+
+  const handleGoExternal = () => {
+    const base = `https://bill.pitc.com.pk/${selectedCompany}bill`;
+    const url = referenceNo ? `${base}/general?refno=${encodeURIComponent(referenceNo)}` : base;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const isDirectSupported = Boolean(companies.find(c => c.code === selectedCompany)?.direct);
 
   return (
     <Card className="border-border shadow-2xl shadow-foreground/5 bg-card rounded-3xl sm:rounded-[3rem] overflow-hidden">
@@ -259,37 +307,75 @@ function BillPrintSection() {
           <div className="space-y-1">
             <CardTitle className="text-xl sm:text-2xl font-black tracking-tight uppercase flex items-center gap-3">
               <Printer className="h-5 w-5 text-primary" />
-              Print Official Bill
+              Official Electricity Bill
             </CardTitle>
             <CardDescription className="font-bold text-muted-foreground uppercase text-[9px] sm:text-[10px] tracking-widest mt-1">
-              Get a printable copy from PITB official portal
+              {isDirectSupported
+                ? 'Directly print or save your authentic official bill as PDF with verified tokens'
+                : 'Get a printable copy from official PITC portal'}
             </CardDescription>
           </div>
+          {isDirectSupported && (
+            <Badge className="bg-primary/10 text-primary border-primary/20 uppercase tracking-widest text-[9px] font-black px-3 py-1">
+              Direct PDF Print
+            </Badge>
+          )}
         </div>
       </CardHeader>
       <CardContent className="p-6 sm:p-10">
         <div className="flex flex-col sm:flex-row gap-4 items-end">
           <div className="flex-1 space-y-2 w-full">
-            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Select Your Company</label>
+            <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Select Distribution Company</label>
             <select
               value={selectedCompany}
-              onChange={(e) => setSelectedCompany(e.target.value)}
+              onChange={(e) => handleCompanyChange(e.target.value)}
               className="w-full h-12 px-4 bg-background border border-border rounded-xl text-sm font-semibold text-foreground appearance-none cursor-pointer focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
             >
               {companies.map(c => (
-                <option key={c.code} value={c.code}>{c.name} — {c.fullName}</option>
+                <option key={c.code} value={c.code}>
+                  {c.code.toUpperCase()} — {c.name} {c.direct ? '⚡ (Direct PDF)' : ''}
+                </option>
               ))}
             </select>
           </div>
-          <Button
-            onClick={handleGo}
-            className="h-12 px-8 bg-primary hover:opacity-90 text-primary-foreground font-bold text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 border-0 gap-2 w-full sm:w-auto shrink-0"
-          >
-            <ExternalLink className="h-4 w-4" /> Go to Bill
-          </Button>
+
+          {referenceNo && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleCopy}
+              className="h-12 px-5 rounded-xl gap-2 w-full sm:w-auto shrink-0 font-mono text-xs hover:bg-muted"
+              title="Copy reference number"
+            >
+              {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+              {referenceNo}
+            </Button>
+          )}
+
+          {isDirectSupported ? (
+            <Button
+              onClick={handlePrintPdf}
+              disabled={!referenceNo}
+              className="h-12 px-8 bg-primary hover:opacity-90 text-primary-foreground font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 border-0 gap-2 w-full sm:w-auto shrink-0"
+              title="Directly opens official bill on our website and prompts to Save as PDF or Print"
+            >
+              <Printer className="h-4 w-4" /> Print / Save PDF
+            </Button>
+          ) : (
+            <Button
+              onClick={handleGoExternal}
+              disabled={!referenceNo}
+              className="h-12 px-8 bg-primary hover:opacity-90 text-primary-foreground font-black text-xs uppercase tracking-wider rounded-xl shadow-md transition-all active:scale-95 border-0 gap-2 w-full sm:w-auto shrink-0"
+            >
+              <ExternalLink className="h-4 w-4" /> Go to Portal
+            </Button>
+          )}
         </div>
+
         <p className="text-[10px] text-muted-foreground/60 mt-3 font-medium">
-          Opens the official PITB bill portal where you can view and print your latest electricity bill.
+          {isDirectSupported
+            ? 'Opens your official LESCO bill with complete tariff breakdown, barcode, and meter photo formatted for A4 printing and instant PDF download.'
+            : 'Opens the official PITC bill portal where you can view and print your electricity bill.'}
         </p>
       </CardContent>
     </Card>
